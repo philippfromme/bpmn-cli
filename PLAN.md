@@ -39,7 +39,7 @@ remains gated by its own approved contract.
 
 ### 3. Agent utility integration
 
-**Status:** approved; implementation in progress.
+**Status:** complete.
 
 Integrate pinned `bpmnlint`, `bpmn-js-differ#next`, and
 `bpmn-auto-layout#next` engines behind focused, bounded `lint`, `diff`, and

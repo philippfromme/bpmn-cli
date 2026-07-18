@@ -1,11 +1,12 @@
 # bpmn-cli
 
-Agent-first Node.js CLI for bounded, descriptor-faithful inspection and trace
-analysis of BPMN business semantics. Diagram Interchange, colors, and
-presentation-only modeler data are excluded.
+Agent-first Node.js CLI for bounded BPMN inspection, tracing, linting, semantic
+diffing, and layout. Business-semantic views exclude Diagram Interchange,
+colors, and presentation-only modeler data.
 
-Mutation is intentionally unavailable. Its contract remains gated by
-[PLAN.md](PLAN.md) and the agent-first principles in [AGENTS.md](AGENTS.md).
+Business-semantic mutation is intentionally unavailable. Its preview-first
+contract remains gated by [PLAN.md](PLAN.md) and the agent-first principles in
+[AGENTS.md](AGENTS.md).
 
 ## Requirements
 
@@ -100,6 +101,50 @@ offline artifact:
 bpmn-cli trace "model.bpmn" --from Task_1 --all --json --output "trace.json"
 ```
 
+## Agent utility workflow
+
+Run BPMN policy checks through the bundled `bpmnlint` engine:
+
+```sh
+bpmn-cli lint "model.bpmn" --json
+bpmn-cli lint "model.bpmn" --config ".bpmnlintrc" --json
+```
+
+The current directory's `.bpmnlintrc` is used automatically. Without one,
+`bpmnlint:correctness` is the fallback. Configured errors exit `1`; warnings
+alone exit `0`. Lint is policy analysis, not an edit-safety gate.
+
+Compare descriptor-faithful business semantics through the pinned
+`bpmn-js-differ#next` engine:
+
+```sh
+bpmn-cli diff "before.bpmn" "after.bpmn" --json
+bpmn-cli diff "before.bpmn" "after.bpmn" --include-layout --json
+```
+
+DI, colors, formatting, namespace prefixes, and excluded template icons do not
+create semantic changes. `--include-layout` reports DI changes separately.
+Different models remain successful results with `changed: true` and exit `0`.
+
+Replace all existing DI through the pinned `bpmn-auto-layout#next` engine:
+
+```sh
+bpmn-cli layout "model.bpmn" --json
+bpmn-cli layout "model.bpmn" --output "laid-out.bpmn" --json
+```
+
+Layout replaces the source atomically by default. `--output` leaves the source
+unchanged; replacing an existing output additionally requires `--force`.
+Nothing is published unless the generated XML reloads successfully and its
+business-semantic hash exactly matches the input.
+
+Large lint and diff results require an offline JSON report:
+
+```sh
+bpmn-cli lint "model.bpmn" --json --report "lint.json"
+bpmn-cli diff "before.bpmn" "after.bpmn" --json --report "diff.json"
+```
+
 ## Profiles and extensions
 
 The standard Zeebe namespace activates the bundled `zeebe-bpmn-moddle`
@@ -154,11 +199,14 @@ JSON-pointer paths for addressing.
 bpmn-cli --help
 bpmn-cli inspect --help
 bpmn-cli trace --help
+bpmn-cli lint --help
+bpmn-cli diff --help
+bpmn-cli layout --help
 bpmn-cli help inspect
 bpmn-cli help trace
 bpmn-cli capabilities --json
 ```
 
 Machine-readable results and errors use `schemaVersion: "1"`. `capabilities`
-distinguishes implemented inspection and tracing from planned validation and
-mutation commands.
+reports bundled engine versions and pinned commits, implemented commands, and
+the planned semantic edit command.

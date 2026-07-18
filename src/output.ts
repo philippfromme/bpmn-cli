@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import {
   access,
+  chmod,
   link,
   rename,
   rm,
@@ -14,25 +15,28 @@ export async function writeOutputFile(
   path: string,
   contents: string,
   force: boolean,
-  sourcePath: string
+  sourcePath: string | readonly string[]
 ): Promise<void> {
   const resolved = resolve(path);
-  const resolvedSource = resolve(sourcePath);
+  const resolvedSources = (
+    Array.isArray(sourcePath) ? sourcePath : [sourcePath]
+  ).map((source) => resolve(source));
 
-  if (resolved === resolvedSource) {
+  if (resolvedSources.includes(resolved)) {
     throw new Error("Output file must not be the BPMN source");
   }
 
   try {
-    const [outputStats, sourceStats] = await Promise.all([
+    const [outputStats, ...sourceStats] = await Promise.all([
       stat(resolved),
-      stat(resolvedSource)
+      ...resolvedSources.map((source) => stat(source))
     ]);
 
-    if (
-      outputStats.dev === sourceStats.dev &&
-      outputStats.ino === sourceStats.ino
-    ) {
+    if (sourceStats.some(
+      (source) =>
+        outputStats.dev === source.dev &&
+        outputStats.ino === source.ino
+    )) {
       throw new Error("Output file must not alias the BPMN source");
     }
   } catch (error) {
@@ -62,6 +66,7 @@ export async function writeOutputFile(
         throw error;
       }
     }
+
   }
 
   const temporary = join(
@@ -80,6 +85,29 @@ export async function writeOutputFile(
     } else {
       await link(temporary, resolved);
     }
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
+
+export async function replaceSourceFile(
+  path: string,
+  contents: string
+): Promise<void> {
+  const resolved = resolve(path);
+  const sourceStats = await stat(resolved);
+  const temporary = join(
+    dirname(resolved),
+    `.${basename(resolved)}.${randomUUID()}.tmp`
+  );
+
+  try {
+    await writeFile(temporary, contents, {
+      encoding: "utf8",
+      flag: "wx"
+    });
+    await chmod(temporary, sourceStats.mode);
+    await rename(temporary, resolved);
   } finally {
     await rm(temporary, { force: true });
   }

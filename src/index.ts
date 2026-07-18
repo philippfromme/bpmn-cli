@@ -4,7 +4,11 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 
+import { executeDiff, diffLimits } from "./diff.js";
+import { engines } from "./engines.js";
 import { executeInspect, inspectLimits } from "./inspect.js";
+import { executeLayout } from "./layout.js";
+import { executeLint, lintLimits } from "./lint.js";
 import { executeTrace, traceLimits } from "./trace.js";
 
 interface PackageManifest {
@@ -64,6 +68,23 @@ export interface Capabilities {
     };
     modes: readonly ["forward", "backward", "connecting"];
   };
+  utilities: {
+    diff: {
+      formats: readonly ["text", "json"];
+      includeLayout: "opt-in";
+      limits: typeof diffLimits;
+    };
+    engines: typeof engines;
+    layout: {
+      formats: readonly ["text", "json"];
+      writes: "in-place-or-output";
+    };
+    lint: {
+      fallbackConfig: "bpmnlint:correctness";
+      formats: readonly ["text", "json"];
+      limits: typeof lintLimits;
+    };
+  };
 }
 
 const require = createRequire(import.meta.url);
@@ -78,7 +99,10 @@ Usage:
 
 Commands:
   capabilities      Show implemented and planned capabilities
+  diff              Compare BPMN semantics
   inspect           Inspect bounded BPMN business semantics
+  layout            Replace BPMN DI with greenfield layout
+  lint              Run configured bpmnlint rules
   trace             Trace bounded BPMN business behavior
   help [command]    Show global or command-specific help
 
@@ -112,7 +136,7 @@ export function getCapabilities(): Capabilities {
       {
         name: "capabilities",
         status: "available",
-        outputFormats: ["text", "json", "mermaid"]
+        outputFormats: ["text", "json"]
       },
       {
         name: "inspect",
@@ -122,13 +146,24 @@ export function getCapabilities(): Capabilities {
       {
         name: "trace",
         status: "available",
+        outputFormats: ["text", "json", "mermaid"]
+      },
+      {
+        name: "lint",
+        status: "available",
         outputFormats: ["text", "json"]
       },
-      { name: "validate", status: "planned" },
-      { name: "plan", status: "planned" },
-      { name: "diff", status: "planned" },
-      { name: "apply", status: "planned" },
-      { name: "verify", status: "planned" }
+      {
+        name: "diff",
+        status: "available",
+        outputFormats: ["text", "json"]
+      },
+      {
+        name: "layout",
+        status: "available",
+        outputFormats: ["text", "json"]
+      },
+      { name: "edit", status: "planned" }
     ],
     bpmn: {
       parsing: true,
@@ -158,6 +193,23 @@ export function getCapabilities(): Capabilities {
         outputFiles: "full"
       },
       modes: ["forward", "backward", "connecting"]
+    },
+    utilities: {
+      diff: {
+        formats: ["text", "json"],
+        includeLayout: "opt-in",
+        limits: diffLimits
+      },
+      engines,
+      layout: {
+        formats: ["text", "json"],
+        writes: "in-place-or-output"
+      },
+      lint: {
+        fallbackConfig: "bpmnlint:correctness",
+        formats: ["text", "json"],
+        limits: lintLimits
+      }
     }
   };
 }
@@ -181,6 +233,9 @@ Inspect views: model, process, scope, element
 Inspect formats: text, json, jsonl
 Trace modes: forward, backward, connecting
 Trace formats: text, json, mermaid
+Lint fallback: bpmnlint:correctness
+Diff layout changes: opt-in
+Layout writes: in-place or output
 `;
 }
 
@@ -237,6 +292,18 @@ async function executeHelp(args: readonly string[]): Promise<CliResult> {
     return executeTrace(["--help"]);
   }
 
+  if (args.length === 1 && args[0] === "lint") {
+    return executeLint(["--help"]);
+  }
+
+  if (args.length === 1 && args[0] === "diff") {
+    return executeDiff(["--help"]);
+  }
+
+  if (args.length === 1 && args[0] === "layout") {
+    return executeLayout(["--help"]);
+  }
+
   return invalidArguments(["help", ...args]);
 }
 
@@ -267,6 +334,18 @@ export async function execute(args: readonly string[]): Promise<CliResult> {
 
   if (args[0] === "trace") {
     return executeTrace(args.slice(1));
+  }
+
+  if (args[0] === "lint") {
+    return executeLint(args.slice(1));
+  }
+
+  if (args[0] === "diff") {
+    return executeDiff(args.slice(1));
+  }
+
+  if (args[0] === "layout") {
+    return executeLayout(args.slice(1));
   }
 
   return invalidArguments(args);

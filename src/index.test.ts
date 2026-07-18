@@ -11,7 +11,10 @@ import {
 } from "./index.js";
 
 const require = createRequire(import.meta.url);
-const packageManifest = require("../package.json") as { version: string };
+const packageManifest = require("../package.json") as {
+  dependencies: Record<string, string>;
+  version: string;
+};
 const entrypoint = fileURLToPath(new URL("./index.js", import.meta.url));
 const fixture = fileURLToPath(
   new URL("../test/fixtures/AI Email Support Agent.bpmn", import.meta.url)
@@ -27,6 +30,9 @@ test("renders discoverable global help", async () => {
     assert.match(result.output, /capabilities/);
     assert.match(result.output, /inspect/);
     assert.match(result.output, /trace/);
+    assert.match(result.output, /lint/);
+    assert.match(result.output, /diff/);
+    assert.match(result.output, /layout/);
     assert.match(result.output, /help \[command\]/);
     assert.match(result.output, /bpmn-cli <command> --help/);
     assert.match(result.output, /PLAN\.md/);
@@ -84,6 +90,36 @@ test("reports agent-discoverable capabilities", async () => {
     },
     modes: ["forward", "backward", "connecting"]
   });
+  assert.equal(capabilities.utilities.lint.fallbackConfig, "bpmnlint:correctness");
+  assert.equal(capabilities.utilities.diff.includeLayout, "opt-in");
+  assert.equal(capabilities.utilities.layout.writes, "in-place-or-output");
+  assert.match(capabilities.utilities.engines.differ.commit, /^[0-9a-f]{40}$/);
+  assert.match(
+    capabilities.utilities.engines.autoLayout.commit,
+    /^[0-9a-f]{40}$/
+  );
+  assert.ok(
+    packageManifest.dependencies["bpmn-js-differ"]?.endsWith(
+      capabilities.utilities.engines.differ.commit
+    )
+  );
+  assert.ok(
+    packageManifest.dependencies["bpmn-auto-layout"]?.endsWith(
+      capabilities.utilities.engines.autoLayout.commit
+    )
+  );
+  assert.deepEqual(
+    capabilities.commands.find(
+      (command: { name: string }) => command.name === "capabilities"
+    )?.outputFormats,
+    ["text", "json"]
+  );
+  assert.deepEqual(
+    capabilities.commands.find(
+      (command: { name: string }) => command.name === "trace"
+    )?.outputFormats,
+    ["text", "json", "mermaid"]
+  );
   assert.match((await execute(["capabilities"])).output, /Inspect views:/);
 });
 
@@ -91,6 +127,9 @@ test("renders command help through both forms", async () => {
   const capabilities = await execute(["help", "capabilities"]);
   const inspect = await execute(["help", "inspect"]);
   const trace = await execute(["help", "trace"]);
+  const lint = await execute(["help", "lint"]);
+  const diff = await execute(["help", "diff"]);
+  const layout = await execute(["help", "layout"]);
 
   assert.match(capabilities.output, /bpmn-cli capabilities \[--json\]/);
   assert.match(inspect.output, /--scope <id>/);
@@ -99,6 +138,9 @@ test("renders command help through both forms", async () => {
   assert.match(inspect.output, /32 KiB/);
   assert.match(trace.output, /--follow-message-flows/);
   assert.match(trace.output, /32 KiB/);
+  assert.match(lint.output, /bpmnlint:correctness/);
+  assert.match(diff.output, /--include-layout/);
+  assert.match(layout.output, /semantic hashes/);
 
   for (const option of ["--help", "-h"]) {
     assert.match(

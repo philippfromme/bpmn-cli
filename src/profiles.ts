@@ -96,7 +96,7 @@ export function declaresNamespace(xml: string, namespace: string): boolean {
   return false;
 }
 
-function validateDescriptor(
+export function validateDescriptor(
   descriptor: unknown,
   source: string
 ): asserts descriptor is ModdlePackageDescriptor {

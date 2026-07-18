@@ -18,6 +18,7 @@ declare module "bpmn-moddle" {
   }
 
   export interface ModdleDescriptor {
+    isAbstract?: boolean;
     isGeneric?: boolean;
     name: string;
     ns: ModdleNamespace;
@@ -30,7 +31,11 @@ declare module "bpmn-moddle" {
     $parent?: ModdleElement;
     $type: string;
     $instanceOf(type: string): boolean;
+    $model: {
+      create(type: string, properties?: Record<string, unknown>): ModdleElement;
+    };
     get(name: string): unknown;
+    set(name: string, value: unknown): void;
     id?: string;
     name?: string;
     incoming?: ModdleElement[];
@@ -65,6 +70,11 @@ declare module "bpmn-moddle" {
 
   export class BpmnModdle {
     constructor(packages?: Record<string, unknown>);
+    create(type: string, properties?: Record<string, unknown>): ModdleElement;
     fromXML(xml: string): Promise<ParseResult>;
+    toXML(
+      element: ModdleElement,
+      options?: { format?: boolean; preamble?: boolean }
+    ): Promise<{ xml: string }>;
   }
 }

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1",
+  "operations": [
+    {
+      "op": "add",
+      "target": "Process_1",
+      "path": "/flowElements/-",
+      "value": {
+        "$type": "bpmn:UserTask",
+        "name": "Review application"
+      },
+      "as": "$review",
+      "expect": [
+        {
+          "target": "Process_1",
+          "path": "/flowElements",
+          "length": 10
+        }
+      ]
+    },
+    {
+      "op": "replace",
+      "target": "Flow_Approve",
+      "path": "/targetRef",
+      "value": "$review",
+      "expect": [
+        {
+          "target": "Flow_Approve",
+          "path": "/targetRef",
+          "equals": "Task_Approve"
+        }
+      ]
+    },
+    {
+      "op": "add",
+      "target": "Process_1",
+      "path": "/flowElements/-",
+      "value": {
+        "$type": "bpmn:SequenceFlow",
+        "sourceRef": "$review",
+        "targetRef": "Task_Approve"
+      },
+      "as": "$afterReview",
+      "expect": [
+        {
+          "target": "Process_1",
+          "path": "/flowElements",
+          "length": 11
+        }
+      ]
+    }
+  ]
+}

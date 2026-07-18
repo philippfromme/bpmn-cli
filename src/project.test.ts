@@ -24,10 +24,12 @@ const fixture = fileURLToPath(
 
 test("classifies every descriptor property reached in the real fixture", async () => {
   const source = await readFile(fixture);
-  const parsed = await new BpmnModdle({ zeebe }).fromXML(source.toString("utf8"));
+  const moddle = new BpmnModdle({ zeebe });
+  const parsed = await moddle.fromXML(source.toString("utf8"));
   const model = createSemanticModel({
     definitions: parsed.rootElement,
     disabledZeebe: false,
+    moddle,
     parseWarnings: parsed.warnings,
     profiles: [],
     sourceBytes: source,

@@ -127,6 +127,7 @@ export async function loadSemanticModelFromDocument(
     return createSemanticModel({
       definitions: parsedBpmn.rootElement,
       disabledZeebe: profiles.declaresDisabledZeebe,
+      moddle,
       parseWarnings: parsedBpmn.warnings,
       profiles: [
         ...profiles.active,

@@ -28,6 +28,10 @@ export interface DiffCommandResult {
   stream: "stderr" | "stdout";
 }
 
+function compareStrings(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 interface DiffOptions {
   autoProfile: boolean;
   before: string;
@@ -234,7 +238,7 @@ function normalizedValue(
   const result: JsonObject = {};
 
   for (const [key, entry] of Object.entries(value).sort(([left], [right]) =>
-    left.localeCompare(right)
+    compareStrings(left, right)
   )) {
     if (key.startsWith("$") || typeof entry === "function") {
       continue;
@@ -273,7 +277,7 @@ function normalizedChanges(
   const afterElement = after.byId.get(id);
   const changes = Object.entries(raw.attrs)
     .filter(([path]) => !excludedPath(path))
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => compareStrings(left, right))
     .map(([path, change]) => {
       const segments = change.path ?? pathSegments(path);
       const beforeValue = normalizedValue(
@@ -320,7 +324,7 @@ function projectedElements(
       ([left], [right]) =>
         (order.get(left) ?? Number.MAX_SAFE_INTEGER) -
           (order.get(right) ?? Number.MAX_SAFE_INTEGER) ||
-        left.localeCompare(right)
+        compareStrings(left, right)
     )
     .map(([, element]) => ({ element: projectElement(element).value }));
 }
@@ -337,9 +341,40 @@ function profileRecords(model: SemanticModel): JsonValue[] {
   return model.profiles.map(
     (profile) =>
       Object.fromEntries(
-        Object.entries(profile).filter(([, value]) => value !== undefined)
+        Object.entries(profile).filter(
+          ([key, value]) => key !== "descriptorSha256" && value !== undefined
+        )
       ) as JsonObject
   );
+}
+
+export function semanticChanges(
+  before: SemanticModel,
+  after: SemanticModel
+): JsonObject {
+  const raw = diff(before.definitions, after.definitions);
+  const added = projectedElements(raw._added, after);
+  const removed = projectedElements(raw._removed, before);
+  const beforeOrder = modelOrder(before);
+  const afterOrder = modelOrder(after);
+  const changed =
+    before.semanticHash === after.semanticHash
+      ? []
+      : Object.entries(raw._changed)
+          .sort(
+            ([left], [right]) =>
+              (beforeOrder.get(left) ?? Number.MAX_SAFE_INTEGER) -
+                (beforeOrder.get(right) ?? Number.MAX_SAFE_INTEGER) ||
+              (afterOrder.get(left) ?? Number.MAX_SAFE_INTEGER) -
+                (afterOrder.get(right) ?? Number.MAX_SAFE_INTEGER) ||
+              compareStrings(left, right)
+          )
+          .map(([id, change]) =>
+            normalizedChanges(id, change, before, after)
+          )
+          .filter((record): record is JsonObject => record !== undefined);
+
+  return { added, removed, changed };
 }
 
 function renderText(envelope: JsonObject): string {
@@ -400,26 +435,10 @@ export async function executeDiff(
   try {
     const { before, after } = await loadModels(options);
     const raw = diff(before.definitions, after.definitions);
-    const added = projectedElements(raw._added, after);
-    const removed = projectedElements(raw._removed, before);
-    const beforeOrder = modelOrder(before);
-    const afterOrder = modelOrder(after);
-    const changed =
-      before.semanticHash === after.semanticHash
-        ? []
-        : Object.entries(raw._changed)
-            .sort(
-              ([left], [right]) =>
-                (beforeOrder.get(left) ?? Number.MAX_SAFE_INTEGER) -
-                  (beforeOrder.get(right) ?? Number.MAX_SAFE_INTEGER) ||
-                (afterOrder.get(left) ?? Number.MAX_SAFE_INTEGER) -
-                  (afterOrder.get(right) ?? Number.MAX_SAFE_INTEGER) ||
-                left.localeCompare(right)
-            )
-            .map(([id, change]) =>
-              normalizedChanges(id, change, before, after)
-            )
-            .filter((record): record is JsonObject => record !== undefined);
+    const changes = semanticChanges(before, after);
+    const added = changes.added as JsonValue[];
+    const removed = changes.removed as JsonValue[];
+    const changed = changes.changed as JsonValue[];
     const layoutChanged = options.includeLayout
       ? Object.keys(raw._layoutChanged).sort()
       : [];
@@ -443,7 +462,7 @@ export async function executeDiff(
         profiles: profileRecords(after)
       },
       engine: engines.differ,
-      changes: { added, removed, changed },
+      changes,
       ...(options.includeLayout ? { layoutChanged } : {})
     };
     const output = options.json

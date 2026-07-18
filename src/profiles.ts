@@ -1,8 +1,13 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
 const require = createRequire(import.meta.url);
+const zeebeDescriptorBytes = readFileSync(
+  require.resolve("zeebe-bpmn-moddle/resources/zeebe.json")
+);
 const zeebeDescriptor = require(
   "zeebe-bpmn-moddle/resources/zeebe.json"
 ) as ModdlePackageDescriptor;
@@ -44,6 +49,7 @@ const RESERVED_NAMESPACES = [
 ] as const;
 
 export interface ActiveProfile {
+  descriptorSha256?: string;
   name: string;
   namespace: string;
   package?: string;
@@ -198,6 +204,7 @@ async function loadExtension(
   specification: string
 ): Promise<{
   descriptor: ModdlePackageDescriptor;
+  descriptorSha256: string;
   name: string;
   path: string;
 }> {
@@ -238,7 +245,12 @@ async function loadExtension(
 
   validateDescriptor(descriptor, path);
 
-  return { descriptor, name, path };
+  return {
+    descriptor,
+    descriptorSha256: createHash("sha256").update(contents).digest("hex"),
+    name,
+    path
+  };
 }
 
 export async function resolveProfiles(
@@ -257,6 +269,9 @@ export async function resolveProfiles(
   if (zeebeSource !== undefined) {
     packages.zeebe = zeebeDescriptor;
     active.push({
+      descriptorSha256: createHash("sha256")
+        .update(zeebeDescriptorBytes)
+        .digest("hex"),
       name: "zeebe",
       namespace: ZEEBE_NAMESPACE,
       package: "zeebe-bpmn-moddle",
@@ -283,6 +298,7 @@ export async function resolveProfiles(
 
     packages[extension.name] = extension.descriptor;
     active.push({
+      descriptorSha256: extension.descriptorSha256,
       name: extension.name,
       namespace: extension.descriptor.uri,
       path: extension.path,

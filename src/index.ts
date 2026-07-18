@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 
 import { executeDiff, diffLimits } from "./diff.js";
+import { editLimits, executeEdit } from "./edit.js";
 import { engines } from "./engines.js";
 import { executeInspect, inspectLimits } from "./inspect.js";
 import { executeLayout } from "./layout.js";
@@ -41,7 +42,7 @@ export interface Capabilities {
   commands: readonly CapabilityCommand[];
   bpmn: {
     parsing: true;
-    mutation: false;
+    mutation: true;
     moddleExtensions: readonly string[];
   };
   inspection: {
@@ -67,6 +68,12 @@ export interface Capabilities {
       outputFiles: "full";
     };
     modes: readonly ["forward", "backward", "connecting"];
+  };
+  editing: {
+    approval: "plan-hash";
+    layout: "default-auto";
+    limits: typeof editLimits;
+    operations: readonly ["add", "remove", "replace", "move"];
   };
   utilities: {
     diff: {
@@ -100,6 +107,7 @@ Usage:
 Commands:
   capabilities      Show implemented and planned capabilities
   diff              Compare BPMN semantics
+  edit              Preview or apply descriptor-driven BPMN changes
   inspect           Inspect bounded BPMN business semantics
   layout            Replace BPMN DI with greenfield layout
   lint              Run configured bpmnlint rules
@@ -110,8 +118,8 @@ Options:
   -h, --help       Display this help message
   -v, --version    Display the CLI version
 
-Model mutation commands will be added only after their contracts are approved
-in PLAN.md. Run "bpmn-cli <command> --help" for command options.
+The Edit v1 safety contract is documented in PLAN.md.
+Run "bpmn-cli <command> --help" for command options.
 `;
 
 const capabilitiesHelpText = `Usage:
@@ -163,11 +171,15 @@ export function getCapabilities(): Capabilities {
         status: "available",
         outputFormats: ["text", "json"]
       },
-      { name: "edit", status: "planned" }
+      {
+        name: "edit",
+        status: "available",
+        outputFormats: ["text", "json"]
+      }
     ],
     bpmn: {
       parsing: true,
-      mutation: false,
+      mutation: true,
       moddleExtensions: ["zeebe"]
     },
     inspection: {
@@ -193,6 +205,12 @@ export function getCapabilities(): Capabilities {
         outputFiles: "full"
       },
       modes: ["forward", "backward", "connecting"]
+    },
+    editing: {
+      approval: "plan-hash",
+      layout: "default-auto",
+      limits: editLimits,
+      operations: ["add", "remove", "replace", "move"]
     },
     utilities: {
       diff: {
@@ -228,7 +246,7 @@ Commands:
 ${commands}
 
 BPMN parsing: available
-BPMN mutation: not implemented
+BPMN mutation: available (preview and plan-hash apply)
 Inspect views: model, process, scope, element
 Inspect formats: text, json, jsonl
 Trace modes: forward, backward, connecting
@@ -300,6 +318,10 @@ async function executeHelp(args: readonly string[]): Promise<CliResult> {
     return executeDiff(["--help"]);
   }
 
+  if (args.length === 1 && args[0] === "edit") {
+    return executeEdit(["--help"]);
+  }
+
   if (args.length === 1 && args[0] === "layout") {
     return executeLayout(["--help"]);
   }
@@ -342,6 +364,10 @@ export async function execute(args: readonly string[]): Promise<CliResult> {
 
   if (args[0] === "diff") {
     return executeDiff(args.slice(1));
+  }
+
+  if (args[0] === "edit") {
+    return executeEdit(args.slice(1));
   }
 
   if (args[0] === "layout") {

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1",
+  "operations": [
+    {
+      "op": "remove",
+      "target": "Flow_Conditional",
+      "path": "/conditionExpression",
+      "expect": [
+        {
+          "target": "Flow_Conditional",
+          "path": "/conditionExpression/body",
+          "equals": "= approved"
+        }
+      ]
+    },
+    {
+      "op": "remove",
+      "target": "Task_Isolated",
+      "path": "",
+      "expect": [
+        {
+          "target": "Task_Isolated",
+          "path": "/$type",
+          "equals": "bpmn:Task"
+        },
+        {
+          "target": "Task_Isolated",
+          "path": "/incoming",
+          "length": 0
+        },
+        {
+          "target": "Task_Isolated",
+          "path": "/outgoing",
+          "length": 0
+        }
+      ]
+    }
+  ]
+}

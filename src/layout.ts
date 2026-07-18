@@ -139,7 +139,9 @@ function profileRecords(profiles: readonly object[]): JsonValue[] {
   return profiles.map(
     (profile) =>
       Object.fromEntries(
-        Object.entries(profile).filter(([, value]) => value !== undefined)
+        Object.entries(profile).filter(
+          ([key, value]) => key !== "descriptorSha256" && value !== undefined
+        )
       ) as JsonObject
   );
 }

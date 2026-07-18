@@ -1,12 +1,8 @@
 # bpmn-cli
 
-Agent-first Node.js CLI for bounded BPMN inspection, tracing, linting, semantic
-diffing, and layout. Business-semantic views exclude Diagram Interchange,
-colors, and presentation-only modeler data.
-
-Business-semantic mutation is intentionally unavailable. Its preview-first
-contract remains gated by [PLAN.md](PLAN.md) and the agent-first principles in
-[AGENTS.md](AGENTS.md).
+Agent-first Node.js CLI for bounded BPMN inspection, tracing, safe editing,
+linting, semantic diffing, and layout. Business-semantic operations exclude
+Diagram Interchange, colors, and presentation-only modeler data.
 
 ## Requirements
 
@@ -102,6 +98,30 @@ bpmn-cli trace "model.bpmn" --from Task_1 --all --json --output "trace.json"
 ```
 
 ## Agent utility workflow
+
+Discover the strict Edit v1 request schema, then preview a descriptor-driven
+transaction:
+
+```sh
+bpmn-cli edit --schema --json
+bpmn-cli edit "model.bpmn" --request "edit.json" --json
+```
+
+Preview never writes BPMN. Apply reruns the complete transaction and requires
+the exact `planHash` returned by preview:
+
+```sh
+bpmn-cli edit "model.bpmn" --request "edit.json" \
+  --apply "<planHash>" --json
+bpmn-cli edit "model.bpmn" --request "edit.json" \
+  --apply "<planHash>" --output "edited.bpmn" --json
+```
+
+Edit supports `add`, `remove`, `replace`, and `move` over loaded BPMN, Zeebe,
+and custom moddle descriptors. Auto-layout is the default; `--no-layout`
+removes DI. Every operation requires explicit preconditions, and reciprocal
+BPMN references are normalized and reported as effects. See [PLAN.md](PLAN.md)
+for the complete safety contract.
 
 Run BPMN policy checks through the bundled `bpmnlint` engine:
 
@@ -201,6 +221,7 @@ bpmn-cli inspect --help
 bpmn-cli trace --help
 bpmn-cli lint --help
 bpmn-cli diff --help
+bpmn-cli edit --help
 bpmn-cli layout --help
 bpmn-cli help inspect
 bpmn-cli help trace
@@ -208,5 +229,4 @@ bpmn-cli capabilities --json
 ```
 
 Machine-readable results and errors use `schemaVersion: "1"`. `capabilities`
-reports bundled engine versions and pinned commits, implemented commands, and
-the planned semantic edit command.
+reports bundled engine versions and pinned commits and implemented commands.

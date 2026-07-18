@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1",
+  "operations": [
+    {
+      "op": "move",
+      "from": {
+        "target": "Task_InvokeWorker",
+        "path": "/extensionElements/values/1"
+      },
+      "to": {
+        "target": "Task_InvokeWorker",
+        "path": "/extensionElements/values/0"
+      },
+      "expect": [
+        {
+          "target": "Task_InvokeWorker",
+          "path": "/extensionElements/values",
+          "length": 2
+        },
+        {
+          "target": "Task_InvokeWorker",
+          "path": "/extensionElements/values/1/$type",
+          "equals": "zeebe:TaskHeaders"
+        }
+      ]
+    }
+  ]
+}

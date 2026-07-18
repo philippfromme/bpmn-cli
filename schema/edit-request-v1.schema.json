@@ -1,0 +1,295 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bpmn-io/bpmn-cli/schema/edit-request-v1.schema.json",
+  "title": "bpmn-cli Edit v1 request",
+  "description": "A bounded, ordered, descriptor-driven transaction over BPMN business semantics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operations"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1"
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/operation"
+      }
+    }
+  },
+  "$defs": {
+    "elementRef": {
+      "description": "An existing semantic element ID, @definitions, or an alias declared by an earlier operation.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:@definitions|\\$[A-Za-z][A-Za-z0-9_-]*|[A-Za-z_][A-Za-z0-9_.-]*)$"
+    },
+    "alias": {
+      "description": "A transaction-local reference for a newly created contained element.",
+      "type": "string",
+      "pattern": "^\\$[A-Za-z][A-Za-z0-9_-]*$"
+    },
+    "path": {
+      "description": "An RFC 6901 JSON Pointer from the target's descriptor-faithful projection. The empty path addresses the target element itself; /- appends to a collection.",
+      "type": "string",
+      "pattern": "^(?:|/(?:[^~/]|~[01])+(?:/(?:[^~/]|~[01])+)*)$"
+    },
+    "address": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "path"
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/elementRef"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        }
+      }
+    },
+    "scalar": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "moddleValue": {
+      "description": "A descriptor-faithful semantic value. Strings used at reference properties are resolved as IDs or aliases by the descriptor.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/scalar"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/moddleValue"
+          }
+        },
+        {
+          "$ref": "#/$defs/moddleElement"
+        }
+      ]
+    },
+    "moddleElement": {
+      "description": "A new descriptor-defined contained element.",
+      "type": "object",
+      "required": [
+        "$type"
+      ],
+      "properties": {
+        "$type": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*:[A-Za-z_][A-Za-z0-9_.-]*$"
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/moddleValue"
+      }
+    },
+    "expectation": {
+      "description": "A required precondition evaluated immediately before its operation.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "path"
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/elementRef"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "equals": {
+          "$ref": "#/$defs/moddleValue"
+        },
+        "absent": {
+          "const": true
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "equals": {}
+          },
+          "required": [
+            "equals"
+          ]
+        },
+        {
+          "properties": {
+            "absent": {}
+          },
+          "required": [
+            "absent"
+          ]
+        },
+        {
+          "properties": {
+            "length": {}
+          },
+          "required": [
+            "length"
+          ]
+        }
+      ]
+    },
+    "expectations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/expectation"
+      }
+    },
+    "add": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "target",
+        "path",
+        "value",
+        "expect"
+      ],
+      "properties": {
+        "op": {
+          "const": "add"
+        },
+        "target": {
+          "$ref": "#/$defs/elementRef"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "value": {
+          "$ref": "#/$defs/moddleValue"
+        },
+        "as": {
+          "$ref": "#/$defs/alias"
+        },
+        "expect": {
+          "$ref": "#/$defs/expectations"
+        }
+      }
+    },
+    "remove": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "target",
+        "path",
+        "expect"
+      ],
+      "properties": {
+        "op": {
+          "const": "remove"
+        },
+        "target": {
+          "$ref": "#/$defs/elementRef"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "expect": {
+          "$ref": "#/$defs/expectations"
+        }
+      }
+    },
+    "replace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "target",
+        "path",
+        "value",
+        "expect"
+      ],
+      "properties": {
+        "op": {
+          "const": "replace"
+        },
+        "target": {
+          "$ref": "#/$defs/elementRef"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "value": {
+          "$ref": "#/$defs/moddleValue"
+        },
+        "as": {
+          "$ref": "#/$defs/alias"
+        },
+        "expect": {
+          "$ref": "#/$defs/expectations"
+        }
+      }
+    },
+    "move": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "from",
+        "to",
+        "expect"
+      ],
+      "properties": {
+        "op": {
+          "const": "move"
+        },
+        "from": {
+          "$ref": "#/$defs/address"
+        },
+        "to": {
+          "$ref": "#/$defs/address"
+        },
+        "expect": {
+          "$ref": "#/$defs/expectations"
+        }
+      }
+    },
+    "operation": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/add"
+        },
+        {
+          "$ref": "#/$defs/remove"
+        },
+        {
+          "$ref": "#/$defs/replace"
+        },
+        {
+          "$ref": "#/$defs/move"
+        }
+      ]
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import type {
+  BpmnModdle,
   Definitions,
   ModdleElement,
   ModdleParseWarning,
@@ -37,6 +38,7 @@ export interface SemanticModel {
   byId: Map<string, ModdleElement>;
   definitions: Definitions;
   diagnostics: InspectionDiagnostic[];
+  moddle: BpmnModdle;
   profiles: ActiveProfile[];
   semanticHash: string;
   source: InspectionSource;
@@ -145,13 +147,16 @@ function normalizeProjectionDiagnostic(
 
 function profileJson(profile: ActiveProfile): JsonObject {
   return Object.fromEntries(
-    Object.entries(profile).filter(([, value]) => value !== undefined)
+    Object.entries(profile).filter(
+      ([key, value]) => key !== "descriptorSha256" && value !== undefined
+    )
   ) as JsonObject;
 }
 
 export function createSemanticModel(options: {
   definitions: Definitions;
   disabledZeebe: boolean;
+  moddle: BpmnModdle;
   parseWarnings: ModdleParseWarning[];
   profiles: ActiveProfile[];
   sourceBytes: Buffer;
@@ -236,6 +241,7 @@ export function createSemanticModel(options: {
     byId,
     definitions: options.definitions,
     diagnostics,
+    moddle: options.moddle,
     profiles: options.profiles,
     semanticHash: semanticHash(options.definitions),
     source: {

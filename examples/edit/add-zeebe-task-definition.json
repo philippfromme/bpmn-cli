@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1",
+  "operations": [
+    {
+      "op": "add",
+      "target": "Task_InvokeWorker",
+      "path": "/extensionElements",
+      "value": {
+        "$type": "bpmn:ExtensionElements",
+        "values": [
+          {
+            "$type": "zeebe:TaskDefinition",
+            "type": "payment-worker",
+            "retries": "3"
+          }
+        ]
+      },
+      "expect": [
+        {
+          "target": "Task_InvokeWorker",
+          "path": "/extensionElements",
+          "absent": true
+        }
+      ]
+    }
+  ]
+}

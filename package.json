@@ -1,7 +1,7 @@
 {
   "name": "bpmn-cli",
   "version": "0.1.0",
-  "description": "Agent-first inspection, tracing, linting, semantic diffing, and layout for BPMN.",
+  "description": "Agent-first inspection, tracing, safe editing, linting, semantic diffing, and layout for BPMN.",
   "private": true,
   "type": "module",
   "engines": {
@@ -11,7 +11,8 @@
     "bpmn-cli": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "schema"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -28,10 +29,12 @@
     "typescript-eslint": "^8.46.0"
   },
   "dependencies": {
+    "ajv": "^8.18.0",
     "bpmn-auto-layout": "github:bpmn-io/bpmn-auto-layout#7351d19e9838a2923e4182c85effc33f74160224",
     "bpmn-js-differ": "github:bpmn-io/bpmn-js-differ#d55ca44ce5c3379bd852dbec97665d2713e5c086",
     "bpmn-moddle": "^10.0.0",
     "bpmnlint": "^11.12.1",
+    "canonicalize": "^2.1.0",
     "zeebe-bpmn-moddle": "^1.16.0"
   }
 }

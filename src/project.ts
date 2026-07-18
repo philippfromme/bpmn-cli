@@ -11,6 +11,10 @@ export interface JsonObject {
   [key: string]: JsonValue;
 }
 
+function compareStrings(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 export interface ProjectionDiagnostic {
   code: "UNRESOLVED_REFERENCE" | "UNSUPPORTED_EXTENSION_DATA";
   elementRef?: string;
@@ -179,7 +183,7 @@ function plainValue(value: unknown): JsonValue | undefined {
     const result: JsonObject = {};
 
     for (const [key, entry] of Object.entries(value).sort(([left], [right]) =>
-      left.localeCompare(right)
+      compareStrings(left, right)
     )) {
       if (key.startsWith("$") || typeof entry === "function") {
         continue;
@@ -353,7 +357,7 @@ function canonicalize(value: JsonValue): JsonValue {
   if (typeof value === "object" && value !== null) {
     return Object.fromEntries(
       Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => compareStrings(left, right))
         .map(([key, entry]) => [key, canonicalize(entry)])
     );
   }
@@ -393,7 +397,8 @@ export function descriptorCoverage(
   }
 
   return [...coverage.values()].sort((left, right) =>
-    `${left.type}#${left.property}`.localeCompare(
+    compareStrings(
+      `${left.type}#${left.property}`,
       `${right.type}#${right.property}`
     )
   );

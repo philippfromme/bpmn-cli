@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1",
+  "operations": [
+    {
+      "op": "replace",
+      "target": "Task_InvokeWorker",
+      "path": "/extensionElements/values/0/type",
+      "value": "new-worker",
+      "expect": [
+        {
+          "target": "Task_InvokeWorker",
+          "path": "/extensionElements/values/0/type",
+          "equals": "old-worker"
+        }
+      ]
+    },
+    {
+      "op": "replace",
+      "target": "Flow_HighRisk",
+      "path": "/conditionExpression",
+      "value": {
+        "$type": "bpmn:FormalExpression",
+        "body": "= application.risk = \"critical\""
+      },
+      "expect": [
+        {
+          "target": "Flow_HighRisk",
+          "path": "/conditionExpression/body",
+          "equals": "= application.risk = \"high\""
+        }
+      ]
+    },
+    {
+      "op": "replace",
+      "target": "Gateway_Decision",
+      "path": "/default",
+      "value": "Flow_Fallback",
+      "expect": [
+        {
+          "target": "Gateway_Decision",
+          "path": "/default",
+          "equals": "Flow_OldDefault"
+        }
+      ]
+    }
+  ]
+}

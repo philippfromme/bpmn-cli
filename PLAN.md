@@ -209,6 +209,302 @@ bpmn-cli layout <file> --output <path> --force --json
 - Existing Inspect and Trace behavior remains unchanged.
 - Typecheck, lint, tests, and coverage pass.
 
+## Edit v1
+
+**Status:** complete.
+
+The normative request schema is
+[`schema/edit-request-v1.schema.json`](schema/edit-request-v1.schema.json).
+Examples are under [`examples/edit`](examples/edit). The schema and this
+contract are reviewed together; neither silently expands the other.
+
+### Agent workflow
+
+```text
+# Discover the exact request contract
+bpmn-cli edit --schema --json
+
+# Preview only; never writes BPMN
+bpmn-cli edit <file> --request <request.json> --json
+
+# Apply exactly the approved preview
+bpmn-cli edit <file> --request <request.json> --apply <plan-hash> --json
+
+# Write separately instead of atomically replacing the source
+bpmn-cli edit <file> --request <request.json> --apply <plan-hash> \
+  --output <result.bpmn> --json
+```
+
+Preview is the default and cannot write BPMN. Apply requires the same request
+plus the exact `planHash` returned by preview. There is no interactive
+confirmation, force-apply, partial apply, or best-effort mode.
+
+`--profile zeebe`, `--no-auto-profile`, and repeatable `--extension` have the
+same meaning as Inspect, Trace, Diff, and Layout. `--report <path> --json`
+writes a complete preview or apply report. `--force` is valid only with
+`--output` or `--report`, and never bypasses semantic or precondition checks.
+
+### Request and transaction model
+
+An Edit v1 request has `schemaVersion: "1"` and 1-100 ordered operations.
+Unknown fields fail schema validation. Operations execute against one in-memory
+model in request order, so later operations may reference elements generated
+earlier. The transaction either resolves and verifies completely or has no
+effect.
+
+Targets are exact semantic element IDs, the built-in `@definitions` root, or
+transaction-local aliases beginning with `$`. Aliases must be unique and may
+reference only a contained moddle element created by an earlier operation.
+Forward references, duplicate IDs, duplicate aliases, ambiguous IDs, missing
+targets, and alias use outside the transaction fail.
+
+Explicit IDs are optional for newly added contained elements. Omitted IDs are
+deterministically generated when the element's descriptor inherits an ID
+property, using the source semantic hash, normalized request, operation index,
+generated role, and a deterministic collision counter. Preview exposes every
+resolved ID; apply must resolve the same IDs.
+
+Edit v1 supports exactly these operations:
+
+| Operation | Effect |
+| --- | --- |
+| `add` | Add an absent property or insert/append one item in a descriptor collection. |
+| `remove` | Remove one property, collection item, or contained element. |
+| `replace` | Replace one existing property, collection item, or contained element. |
+| `move` | Move one existing contained value while preserving its moddle identity. |
+
+These four operations are exhaustive for writable semantic state represented by
+the loaded BPMN and extension descriptors. Conditions, defaults, event
+definitions, loop characteristics, SequenceFlows, MessageFlows, lanes, data,
+artifacts, root elements, and Zeebe/custom extension elements use the same
+operations and their descriptor property names. The API does not introduce
+`Node`, `Connection`, or other parallel terminology.
+
+### Operation semantics
+
+Every address is an exact target plus an RFC 6901 JSON Pointer over its
+descriptor-faithful projection. The empty path addresses the target element
+itself. Array indexes use current transaction order; `/-` appends. Paths are
+resolved after all previous operations, so index shifts are explicit and
+deterministic.
+
+`add` requires an absent single property or a valid insertion position in an
+`isMany` property. `remove` requires an existing value and removes only that
+addressed value. Removing a contained element also removes its contained
+subtree, but never silently removes external references. `replace` requires an
+existing value. Replacing an element with another concrete `$type` is how an
+element type changes. `move` removes the exact source value and inserts the same
+moddle object at the destination; its destination index is evaluated after
+source removal.
+
+For `add` into an `isMany` property, `/N` inserts before the element currently
+at zero-based index `N`; valid indexes are `0` through the current collection
+length. `/-` is equivalent to `/length` and appends.
+
+When `replace` substitutes one contained moddle element for another and the new
+value omits `id`, the old element's ID is inherited when both descriptors expose
+an ID property. An explicit new ID overrides it. If no old ID exists, the normal
+deterministic generation rule applies. Compatible external references to the
+old object are rebound to the replacement as derived effects; incompatible
+references fail. Whole-element replacement never silently copies any other
+property omitted from the supplied value.
+
+Each operation contains 1-32 preconditions evaluated immediately before that
+operation. A precondition asserts an exact projected `equals` value, property
+absence, or collection `length`. Failure aborts the transaction. Preconditions
+may target existing IDs or earlier aliases, allowing graph assumptions to be
+guarded without echoing an entire large element.
+
+Values use descriptor-faithful JSON. Scalars remain scalars. A reference value
+is an ID or earlier alias, interpreted as a reference because the resolved
+descriptor property is marked `isReference`. A new contained value is an object
+with a concrete qualified `$type`; all other keys must be writable properties
+defined by that type's descriptor. Collections are arrays. `null` is a real
+descriptor value; removing a property uses `remove`, not `null`.
+
+The runtime creates contained objects through moddle factories and dynamically
+validates property existence, inheritance, scalar/enumeration types,
+`isReference`, `isMany`, containment, abstract/concrete types, namespaces, and
+extension package identity. Unknown properties, raw moddle internals,
+unregistered prefixes, incompatible references, and malformed contained values
+fail. Existing id-less elements are addressed from their nearest ID-bearing
+ancestor; `@definitions` permits root-property edits.
+
+After each requested operation, the CLI normalizes BPMN-maintained reciprocal
+references. For example, changing `SequenceFlow.targetRef` removes that flow
+from the old target's `incoming` and adds it to the new target; adding a
+SequenceFlow populates its source's `outgoing` and target's `incoming`.
+Boundary attachment indexes and Link source/target indexes are normalized by
+the same rule family. Removing a referenced SequenceFlow clears its exact
+default owner. These derived writes are not additional request operations, but
+preview lists them under the causing operation's `effects` and includes them in
+the semantic diff and plan hash.
+
+Normalization updates only redundant inverse/index properties required by the
+requested descriptor relationship. It never invents or deletes a separate
+business element, chooses a replacement endpoint, reconnects control flow, or
+silently removes unrelated authored references. Conflicting explicit
+operations or an external semantic reference that cannot be normalized fail
+with an actionable diagnostic.
+
+Operations may otherwise temporarily make the in-memory graph inconsistent.
+Preview succeeds only when the final transaction satisfies all structural
+invariants:
+
+- endpoints must be FlowNodes that may legally own SequenceFlows;
+- source and target must share a legal FlowElements container;
+- BoundaryEvents, StartEvents, and EndEvents obey direction restrictions;
+- event subprocesses and normal subprocess/process flow scopes are not crossed;
+- a default must be an outgoing flow of a compatible Activity/Gateway;
+- a condition must be legal for its source and cannot coexist with default-flow
+  semantics where BPMN forbids it;
+- setting a condition on a current default, or setting a current conditional
+  flow as default, fails unless an earlier operation explicitly clears the
+  conflicting value;
+- End Events, event subprocesses, Link throw events, compensation handlers, and
+  compensation activities cannot source SequenceFlows;
+- Start Events, BoundaryEvents, event subprocesses, Link catch events, and
+  compensation activities cannot target SequenceFlows;
+- EventBased Gateways may target only ReceiveTasks or Message/Timer/
+  Conditional/Signal Intermediate Catch Events; competing incoming flows to
+  those targets are rejected rather than silently removed;
+- Parallel and EventBased Gateways cannot own conditions or defaults;
+- incoming/outgoing, source/target, attachment, default, lane, event, data,
+  message, and other descriptor references must be reciprocal and contained
+  legally;
+- all references and containment must reload without unresolved mutation-created
+  references.
+
+These are structural edit invariants, not lint policy. Edit does not run
+bpmnlint and does not claim deployment/runtime validity. Descriptor-valid
+business semantics are covered; BPMN DI, visual attributes, hard-excluded
+presentation data such as template icons, and raw XML unknown to the loaded
+descriptors remain outside Edit v1.
+
+### Preview and approval token
+
+Preview parses and normalizes the request, checks every target/precondition,
+executes the full transaction in memory, serializes and reloads it, computes
+the exact semantic diff, and rejects no-op operations or an overall no-op
+transaction.
+
+Preview returns a bounded `schemaVersion: "1"` envelope containing:
+
+```text
+{
+  view: "edit-preview",
+  status: "preview",
+  planHash,
+  sourceSha256,
+  requestSha256,
+  beforeSemanticHash,
+  afterSemanticHash,
+  layout: "auto" | "none",
+  operations: [ resolved operations with exact IDs and effects ],
+  changes: { added, removed, changed }
+}
+```
+
+`planHash` is SHA-256 over UTF-8 bytes produced by RFC 8785 JSON Canonicalization
+Scheme (JCS). JCS object-key ordering, number serialization, string escaping,
+and Unicode handling are normative; no additional Unicode normalization is
+performed. Request normalization materializes schema/runtime defaults, omits
+absent optional fields, retains semantic `null` values, and preserves every
+array's order.
+
+The canonical record has exactly this shape:
+
+```text
+{
+  contract: "bpmn-cli/edit-plan@1",
+  sourceSha256,
+  requestSha256,
+  request,
+  profiles: [{
+    name, namespace, package, packageVersion, descriptorSha256, source
+  }],
+  editEngine: { name: "bpmn-cli-edit", version },
+  layout: {
+    mode: "auto" | "none",
+    engine: { name, version, commit } | null
+  },
+  operations,
+  beforeSemanticHash,
+  afterSemanticHash,
+  changes
+}
+```
+
+`requestSha256` is SHA-256 over the JCS-normalized `request`. Custom descriptor
+identities include the exact descriptor-byte hash; bundled profiles include
+their package version and bundled descriptor hash. `operations` and `changes`
+are the same exact resolved values emitted by preview.
+
+Apply reruns preview from the supplied source and request. It proceeds only when
+the recomputed token exactly equals `--apply`. Source changes, request changes,
+profile/descriptor changes, generated-ID changes, CLI/schema changes, layout
+mode changes, or changed results produce `STALE_PLAN` and no output.
+
+### Layout, verification, and publication
+
+Auto-layout is the default and is disabled only by explicit `--no-layout`.
+Auto-layout replaces all DI through the pinned layout engine. `--no-layout`
+removes all DI and writes semantic-only BPMN; stale DI is never preserved.
+Layout failure aborts rather than falling back.
+
+Before publication, apply:
+
+1. serializes the complete edited model in memory;
+2. auto-layouts it or removes DI according to the approved mode;
+3. reloads it with the identical profile/package set;
+4. requires the reloaded semantic hash and semantic diff to equal preview;
+5. rejects parse warnings or unresolved references introduced by the edit;
+6. stages and verifies the final bytes;
+7. atomically replaces the source, or atomically publishes `--output`.
+
+Source replacement is the apply default. `--output` leaves the source untouched
+and refuses aliases. Existing separate outputs require `--force`. No bytes are
+published before all checks pass.
+
+Apply returns the plan hash, destination, input/output SHA-256 values,
+before/after semantic hashes, resolved operations, and verified semantic diff.
+The interactive JSON budget is 32 KiB and never truncates an operation or
+change. Larger complete output requires `--report`.
+
+### Errors and acceptance gate
+
+Stable errors distinguish schema/argument errors, missing or ambiguous targets,
+alias/ID conflicts, failed preconditions, illegal BPMN structure, unsupported
+properties/types, external reference conflicts, no-ops, stale plans, layout
+failure, verification mismatch, oversized output, and source/report/output I/O.
+`EXTERNAL_REFERENCE_CONFLICT` identifies a removal/replacement that leaves an
+authored reference the normalizer cannot safely rebind or clear.
+User/request/safety failures exit `1`; source/descriptor/output I/O exits `2`;
+BPMN parse failures exit `3`.
+
+Edit v1 is complete when tests prove:
+
+- all schema examples validate and every operation has positive and adversarial
+  coverage;
+- generated IDs, aliases, operation ordering, diffs, and hashes are
+  deterministic;
+- reciprocal-reference normalization is deterministic, minimal, attributed to
+  the causing operation, and included in preview and plan hashing;
+- stale sources, requests, profiles, layout modes, and tokens cannot apply;
+- required preconditions and no-op rejection are enforced;
+- scope, endpoint, event, condition, default, and cascade rules reject illegal
+  structures;
+- existing Zeebe/custom extension data survives byte publication without
+  semantic loss;
+- default layout and `--no-layout` both preserve the previewed semantics;
+- layout, reload, verification, staging, and atomic-publication failures leave
+  source/output bytes unchanged;
+- output bounds, reports, help, schema discovery, capabilities, errors, streams,
+  and exit codes match this contract;
+- both real fixtures support representative edits without Inspect, Trace, Lint,
+  Diff, or Layout regressions;
+- typecheck, lint, tests, coverage, package checks, and adversarial review pass.
+
 ## Inspect v1
 
 ### Goal

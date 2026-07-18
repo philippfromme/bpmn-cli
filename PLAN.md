@@ -37,15 +37,177 @@ The bounded, descriptor-faithful inspection contract below is implemented.
 The bounded, BPMN-native Trace v1 contract below is implemented. Safe mutation
 remains gated by its own approved contract.
 
-### 3. Safe mutation
+### 3. Agent utility integration
 
-Design a versioned edit request, then implement plan, review, apply, and verify.
-No mutation command or edit DSL is currently in scope.
+**Status:** approved; implementation in progress.
 
-### 4. Release hardening
+Integrate pinned `bpmnlint`, `bpmn-js-differ#next`, and
+`bpmn-auto-layout#next` engines behind focused, bounded `lint`, `diff`, and
+`layout` commands.
+
+### 4. Safe mutation
+
+Design and implement the approved preview-first Edit v1 transaction contract.
+No mutation code begins until the utility integrations pass their acceptance
+gate and the complete Edit v1 JSON Schema is approved.
+
+### 5. Release hardening
 
 Add compatibility coverage, packaging, CI, security review, and release
 documentation after command contracts stabilize.
+
+## Agent utilities v1
+
+### Shared contract
+
+The CLI is the stable agent-facing orchestration layer; it does not reimplement
+linting, moddle diffing, or layout algorithms.
+
+- Use released `bpmnlint`.
+- Pin `bpmn-js-differ#next` and `bpmn-auto-layout#next` to exact commit SHAs.
+- Report bundled engine package versions and commit SHAs through
+  `capabilities`.
+- Reuse Inspect/Trace profile detection, `--profile zeebe`,
+  `--no-auto-profile`, and repeatable `--extension`.
+- Preserve the hard semantic/presentation boundary: DI is excluded unless a
+  command explicitly requests layout information.
+- Text is the human default; `--json` emits `schemaVersion: "1"` envelopes.
+- Complete JSON stdout is limited to 32 KiB. Never truncate a semantic change
+  or lint record. `--report <path>` writes complete JSON atomically when the
+  bounded stdout representation cannot fit.
+- Reports refuse source aliases and existing paths unless `--force` is present.
+- User/configuration errors exit `1`; source, descriptor, and output I/O errors
+  exit `2`; parse failures exit `3`.
+- Results and records are deterministic for identical source bytes, profiles,
+  engine versions, configuration, and arguments.
+
+### Lint v1
+
+```text
+bpmn-cli lint <file>
+bpmn-cli lint <file> --json
+bpmn-cli lint <file> --config <path>
+bpmn-cli lint <file> --report <path> --json
+```
+
+`lint` wraps `bpmnlint`; it is policy analysis and is never an implicit edit
+safety gate.
+
+- Lint exactly one BPMN file per invocation.
+- Discover `.bpmnlintrc` in the current working directory unless `--config`
+  is supplied.
+- If no configuration exists, use `{ "extends": "bpmnlint:correctness" }`.
+- Preserve bpmnlint rule, preset, plugin, and configuration semantics.
+- Load configuration-relative `moddleExtensions`; reject namespace/package
+  collisions with explicitly selected CLI profiles/extensions.
+- Include moddle import warnings as lint errors, matching bpmnlint behavior.
+- Normalize findings to:
+
+```text
+{ rule, category, message, elementRef?, path? }
+```
+
+- Sort findings by element/model order, then rule, then path.
+- JSON includes `config.source` (`file` or `fallback`) and counts for errors and
+  warnings.
+- Exit `0` when no configured error is reported, including warning-only
+  results. Exit `1` when at least one configured rule or import error is
+  reported.
+- Lint never edits BPMN or configuration files.
+
+### Diff v1
+
+```text
+bpmn-cli diff <before.bpmn> <after.bpmn>
+bpmn-cli diff <before.bpmn> <after.bpmn> --json
+bpmn-cli diff <before.bpmn> <after.bpmn> --include-layout --json
+bpmn-cli diff <before.bpmn> <after.bpmn> --json --report <path>
+```
+
+`diff` wraps the pinned `bpmn-js-differ#next` engine, including extension
+element changes.
+
+- Load both documents with the same profile/extension package set. Automatic
+  detection uses the union of namespaces declared by either document.
+- Default output is semantic only. DI, colors, template icons, formatting, and
+  namespace-prefix differences do not create semantic changes.
+- `--include-layout` adds layout changes in a separate `layoutChanged`
+  collection; it never mixes DI into semantic records.
+- Return:
+
+```text
+{
+  changed,
+  before: { source, semanticHash, profiles },
+  after: { source, semanticHash, profiles },
+  changes: {
+    added: [{ element }],
+    removed: [{ element }],
+    changed: [{ elementRef, $type, changes }]
+  },
+  layoutChanged?
+}
+```
+
+- Each property change contains an exact descriptor path and exact `before` and
+  `after` values. References remain IDs.
+- Added/removed elements use descriptor-faithful projections.
+- Order collections by source model order, then target model order, then ID.
+- Equal models return `changed: false` and empty semantic collections.
+- Different models are successful data: exit `0` with `changed: true`.
+- Diff never edits either input.
+
+### Layout v1
+
+```text
+bpmn-cli layout <file>
+bpmn-cli layout <file> --output <path>
+bpmn-cli layout <file> --json
+bpmn-cli layout <file> --output <path> --force --json
+```
+
+`layout` wraps pinned `bpmn-auto-layout#next`.
+
+- Greenfield layout is intentional: existing DI is replaced.
+- In-place atomic source replacement is the default.
+- `--output` writes a separate result and leaves the source untouched.
+- `--force` is valid only with `--output` and allows replacing that output.
+- Run layout entirely before publication.
+- Parse the laid-out XML with the same profiles and require its semantic hash to
+  equal the input semantic hash. Any semantic difference is a hard failure.
+- Reload and verify the staged output before atomic publication.
+- A `LayoutError` fails explicitly; never publish partial or semantic-only
+  fallback output.
+- Success reports:
+
+```text
+{
+  status: "written",
+  destination,
+  sourceSha256,
+  outputSha256,
+  semanticHash,
+  engine
+}
+```
+
+- Layout does not require a plan hash because the command explicitly requests
+  presentation replacement and proves semantic invariance.
+
+### Agent utilities acceptance gate
+
+- Both real fixtures lint through explicit and fallback configurations.
+- Extension-element changes are detected through the pinned differ.
+- Semantic diff is invariant to DI, formatting, namespace prefixes, colors,
+  and excluded template icons.
+- Layout succeeds for both real fixtures, including collaboration, nested
+  scopes, BoundaryEvents, artifacts, and MessageFlows.
+- Layout changes source bytes but preserves the semantic hash exactly.
+- In-place and separate-output writes are atomic and source-safe.
+- Help, capabilities, text/JSON output, bounds, reports, profiles, errors, and
+  exit codes match the frozen contracts.
+- Existing Inspect and Trace behavior remains unchanged.
+- Typecheck, lint, tests, and coverage pass.
 
 ## Inspect v1
 

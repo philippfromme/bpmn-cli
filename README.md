@@ -23,6 +23,14 @@ npm run test:coverage
 Run the built CLI with `node dist/index.js`, or use the `bpmn-cli` executable
 after linking or packaging it.
 
+## Agent skill and cookbook
+
+The reusable [bpmn-cli agent skill](skills/bpmn-cli/SKILL.md) defines the
+discovery, preview, approval, apply, and verification workflow. Its
+[cookbook](skills/bpmn-cli/cookbook/README.md) contains focused recipes for
+diagnosis, renaming, SequenceFlow splitting, extension data, and safe
+publication.
+
 ## Agent inspection workflow
 
 Start with the bounded model catalog:

@@ -71,7 +71,7 @@ test("reports agent-discoverable capabilities", async () => {
   assert.deepEqual(capabilities.tracing, {
     endpointTypes: ["flowNode", "sequenceFlow", "messageFlow"],
     followMessageFlows: "opt-in",
-    formats: ["text", "json"],
+    formats: ["text", "json", "mermaid"],
     limits: {
       defaultElementBudget: 50,
       maxElementBudget: 100,

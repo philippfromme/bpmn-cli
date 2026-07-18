@@ -81,6 +81,17 @@ bpmn-cli trace "collaboration.bpmn" --to StartEvent_1 \
   --follow-message-flows --json
 ```
 
+For human review, render the same bounded selection as a Mermaid flowchart:
+
+```sh
+bpmn-cli trace "model.bpmn" --from Gateway_1 --to Task_2 --mermaid
+bpmn-cli trace "model.bpmn" --from Task_1 --mermaid --output "trace.mmd"
+```
+
+Mermaid output groups BPMN scopes, labels exact SequenceFlow conditions, uses
+dashed MessageFlows, highlights selected endpoints, and exposes truncation
+frontiers. JSON remains the canonical machine-readable contract.
+
 The default budget is 50 unique semantic elements; the maximum is 100. Bounded
 results report deterministic `frontierRefs`. Complete output requires an
 offline artifact:

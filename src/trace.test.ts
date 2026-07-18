@@ -271,6 +271,7 @@ test("renders trace help without requiring a file or selector", async () => {
     const result = await trace(args);
     assert.equal(result.exitCode, 0);
     assert.match(result.output, /--follow-message-flows/);
+    assert.match(result.output, /--mermaid/);
     assert.match(result.output, /default: 50/);
   }
 });
@@ -378,6 +379,165 @@ test("renders concise text from the bounded trace graph", async () => {
   assert.match(result.output, /Mode: forward/);
   assert.match(result.output, /Truncated: true/);
   assert.doesNotMatch(result.output, /SHA-256|test[\\/]fixtures/);
+});
+
+test("renders a scoped Mermaid review diagram with exact conditions", async () => {
+  const result = await trace([
+    aiFixture,
+    "--from",
+    "Gateway_1whb5u5",
+    "--to",
+    "Activity_062h34x",
+    "--mermaid"
+  ]);
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.output, /^flowchart LR\n/);
+  assert.match(result.output, /subgraph sg_n\d+/);
+  assert.match(
+    result.output,
+    /Flow_1mudddl · yes · =knowledgeBaseDecision = &quot;yes&quot;/
+  );
+  assert.match(result.output, /ExclusiveGateway · Gateway_1whb5u5/);
+  assert.match(result.output, /class n\d+ gateway;/);
+  assert.match(result.output, /class n\d+ endpoint;/);
+  assert.doesNotMatch(result.output, /"schemaVersion"|"trace":/);
+});
+
+test("renders MessageFlows, frontiers, and Mermaid output files", async (context) => {
+  const collaboration = await trace([
+    carRentalFixture,
+    "--to",
+    "Event_1k76lxn",
+    "--follow-message-flows",
+    "--limit",
+    "10",
+    "--mermaid"
+  ]);
+  const bounded = await trace([
+    aiFixture,
+    "--from",
+    "Gateway_1whb5u5",
+    "--limit",
+    "5",
+    "--mermaid"
+  ]);
+  const directory = await mkdtemp(join(tmpdir(), "bpmn-cli-mermaid-"));
+  const output = join(directory, "trace.mmd");
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const written = await trace([
+    aiFixture,
+    "--from",
+    "Gateway_1whb5u5",
+    "--limit",
+    "5",
+    "--mermaid",
+    "--output",
+    output
+  ]);
+
+  assert.equal(collaboration.exitCode, 0);
+  assert.match(collaboration.output, /Participants/);
+  assert.match(collaboration.output, /Flow_05wzjkc/);
+  assert.match(collaboration.output, /n\d+ -\. "Flow_05wzjkc" \.-> n\d+/);
+  assert.match(bounded.output, /%% Trace truncated\. Continue from:/);
+  assert.match(bounded.output, /subgraph sg_frontier\["Truncated frontier"\]/);
+  assert.match(bounded.output, /class frontier\d+ frontier;/);
+  assert.equal(written.exitCode, 0);
+  assert.equal(written.output, "");
+  assert.match(await readFile(output, "utf8"), /^flowchart LR\n/);
+});
+
+test("rejects incompatible Mermaid output options", async () => {
+  const cases = [
+    {
+      args: [
+        aiFixture,
+        "--from",
+        "Gateway_1whb5u5",
+        "--json",
+        "--mermaid"
+      ],
+      message: /--json and --mermaid are mutually exclusive/
+    },
+    {
+      args: [
+        aiFixture,
+        "--from",
+        "Gateway_1whb5u5",
+        "--mermaid",
+        "--pretty"
+      ],
+      message: /--pretty requires --json/
+    },
+    {
+      args: [
+        aiFixture,
+        "--from",
+        "Gateway_1whb5u5",
+        "--mermaid",
+        "--metadata"
+      ],
+      message: /--metadata requires --json/
+    },
+    {
+      args: [
+        aiFixture,
+        "--from",
+        "Gateway_1whb5u5",
+        "--all",
+        "--mermaid",
+        "--output",
+        "trace.mmd"
+      ],
+      message: /--all requires --json and --output/
+    }
+  ];
+
+  for (const { args, message } of cases) {
+    const result = await trace(args);
+    assert.equal(result.exitCode, 1);
+    assert.match(result.output, message);
+  }
+});
+
+test("escapes BPMN-controlled Mermaid labels and uses safe aliases", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "bpmn-cli-mermaid-safe-"));
+  const bpmn = join(directory, "safe-labels.bpmn");
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(
+    bpmn,
+    `<?xml version="1.0"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  id="Definitions_Safe" targetNamespace="https://example.test">
+  <bpmn:process id="Process-Safe">
+    <bpmn:task id="Task-Unsafe" name="Review &quot;A|B&quot; &amp; &lt;done&gt;">
+      <bpmn:outgoing>Flow-Unsafe</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task-Target">
+      <bpmn:incoming>Flow-Unsafe</bpmn:incoming>
+    </bpmn:task>
+    <bpmn:sequenceFlow id="Flow-Unsafe" name="yes | no"
+      sourceRef="Task-Unsafe" targetRef="Task-Target">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=value &lt; 2 and note = &quot;]&quot;</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+  </bpmn:process>
+</bpmn:definitions>`
+  );
+
+  const result = await trace([
+    bpmn,
+    "--from",
+    "Task-Unsafe",
+    "--mermaid"
+  ]);
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.output, /n\d+\(\["Review &quot;A&#124;B&quot; &amp; &lt;done&gt;/);
+  assert.match(result.output, /yes &#124; no/);
+  assert.match(result.output, /note = &quot;&#93;&quot;/);
+  assert.doesNotMatch(result.output, /^\s*Task-Unsafe[\s[(]/m);
 });
 
 test("preserves nested scope entry, completion, and nearest error handling", async () => {

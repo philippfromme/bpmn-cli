@@ -576,6 +576,10 @@ bpmn-cli trace <file> --from <id> --limit 50 --json
 bpmn-cli trace <file> --from <id> --json --pretty
 bpmn-cli trace <file> --from <id> --json --metadata
 
+# Bounded human-review diagram
+bpmn-cli trace <file> --from <id> --mermaid
+bpmn-cli trace <file> --from <id> --mermaid --output <path.mmd>
+
 # Full offline graph
 bpmn-cli trace <file> --from <id> --all --json --output <path>
 
@@ -591,7 +595,7 @@ The frozen Trace v1 options are:
 - exactly one or both of `--from <id>` and `--to <id>`;
 - `--follow-message-flows`;
 - `--limit <1..100>`, default `50`;
-- `--json`, `--pretty`, and `--metadata`;
+- `--json`, `--mermaid`, `--pretty`, and `--metadata`;
 - `--profile zeebe`, `--no-auto-profile`, and repeatable `--extension`;
 - `--all`, `--output <path>`, and `--force`;
 - `-h` and `--help`.
@@ -604,9 +608,11 @@ Option validity is explicit:
 - `--limit` must be an integer from 1 through 100;
 - `--all` and `--limit` are mutually exclusive;
 - `--all` requires `--json` and `--output`;
-- `--output` requires `--json`; bounded JSON may also be written without
-  `--all`;
+- `--json` and `--mermaid` are mutually exclusive;
+- `--output` requires `--json` or `--mermaid`; bounded JSON or Mermaid may be
+  written without `--all`;
 - `--pretty` and `--metadata` require `--json`;
+- Mermaid output is bounded and cannot be combined with `--all`;
 - `--force` requires `--output`;
 - `--follow-message-flows` is required when either selected endpoint is a
   MessageFlow.
@@ -617,6 +623,27 @@ variable input, or condition evaluator. Direction follows the selectors:
 - `--from`: forward;
 - `--to`: backward;
 - `--from` plus `--to`: connecting.
+
+### Human-review Mermaid projection
+
+`--mermaid` renders the same bounded trace selection as a Mermaid `flowchart`.
+It is a presentation projection, not a second canonical graph contract:
+
+- Process and SubProcess containment uses nested `subgraph` blocks.
+- FlowNodes, Participants, data references, referenced definitions, and
+  relevant TextAnnotations use deterministic safe aliases; exact BPMN IDs stay
+  in labels.
+- SequenceFlows render as solid arrows labeled with their exact ID, name, and
+  condition body. MessageFlows and Associations render as dashed arrows.
+- Boundary, event-subprocess, Link, Error, Escalation, Signal, compensation,
+  scope-entry, and scope-completion relationships retain explicit typed labels.
+- Selected endpoints are highlighted. Omitted bounded-frontier references are
+  shown in a dedicated `Truncated frontier` group and repeated in a Mermaid
+  comment for copy/paste follow-up traces.
+- User-controlled labels and expressions are escaped before interpolation into
+  Mermaid syntax.
+- The same element budget and 32 KiB stdout cap apply. Mermaid never evaluates
+  conditions, invents routing, or replaces canonical JSON for automation.
 
 Valid endpoints are FlowNodes and SequenceFlows. MessageFlows are valid only
 when `--follow-message-flows` is enabled. Other addressable BPMN elements fail

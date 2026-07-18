@@ -6,6 +6,7 @@ import {
 } from "./model-loader.js";
 import { writeOutputFile } from "./output.js";
 import type { JsonObject, JsonValue } from "./project.js";
+import { renderTraceMermaid } from "./trace-mermaid.js";
 import {
   createTraceEnvelope,
   TraceGraphError,
@@ -24,7 +25,7 @@ export interface TraceResult {
   stream: "stderr" | "stdout";
 }
 
-type TraceFormat = "json" | "text";
+type TraceFormat = "json" | "mermaid" | "text";
 
 interface TraceOptions {
   all: boolean;
@@ -65,10 +66,11 @@ Profiles:
 
 Output:
   --json                  Emit compact, versioned JSON
+  --mermaid               Emit a human-review Mermaid flowchart
   --pretty                Pretty-print JSON
   --metadata              Include source, semantic hash, and profile metadata
   --all                   Include the complete graph; requires --json --output
-  --output <path>         Write JSON to a new file
+  --output <path>         Write JSON or Mermaid to a new file
   --force                 Allow replacing the output file
   -h, --help              Display this help message
 
@@ -77,7 +79,11 @@ conditions; exact expressions and modeled alternatives are preserved.
 `;
 
 function inferFormat(args: readonly string[]): TraceFormat {
-  return args.includes("--json") ? "json" : "text";
+  if (args.includes("--json")) {
+    return "json";
+  }
+
+  return args.includes("--mermaid") ? "mermaid" : "text";
 }
 
 function errorResult(
@@ -141,6 +147,7 @@ function parseTraceOptions(
         help: { type: "boolean", short: "h" },
         json: { type: "boolean" },
         limit: { type: "string" },
+        mermaid: { type: "boolean" },
         metadata: { type: "boolean" },
         "no-auto-profile": { type: "boolean" },
         output: { type: "string" },
@@ -176,6 +183,10 @@ function parseTraceOptions(
       throw new Error(`unknown profile: ${parsed.values.profile}`);
     }
 
+    if (parsed.values.json && parsed.values.mermaid) {
+      throw new Error("--json and --mermaid are mutually exclusive");
+    }
+
     if (parsed.values.all && parsed.values.limit !== undefined) {
       throw new Error("--all and --limit are mutually exclusive");
     }
@@ -187,8 +198,12 @@ function parseTraceOptions(
       throw new Error("--all requires --json and --output");
     }
 
-    if (parsed.values.output !== undefined && !parsed.values.json) {
-      throw new Error("--output requires --json");
+    if (
+      parsed.values.output !== undefined &&
+      !parsed.values.json &&
+      !parsed.values.mermaid
+    ) {
+      throw new Error("--output requires --json or --mermaid");
     }
 
     if (parsed.values.pretty && !parsed.values.json) {
@@ -295,8 +310,12 @@ function serialize(
   envelope: TraceEnvelope,
   options: TraceOptions
 ): string {
-  return options.format === "json"
-    ? renderJson(envelope, options)
+  if (options.format === "json") {
+    return renderJson(envelope, options);
+  }
+
+  return options.format === "mermaid"
+    ? renderTraceMermaid(envelope)
     : renderText(envelope);
 }
 

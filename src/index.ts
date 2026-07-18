@@ -24,7 +24,7 @@ export interface Writer {
 interface CapabilityCommand {
   name: string;
   status: "available" | "planned";
-  outputFormats?: readonly ("text" | "json" | "jsonl")[];
+  outputFormats?: readonly ("text" | "json" | "jsonl" | "mermaid")[];
 }
 
 export interface Capabilities {
@@ -55,7 +55,7 @@ export interface Capabilities {
   tracing: {
     endpointTypes: readonly ["flowNode", "sequenceFlow", "messageFlow"];
     followMessageFlows: "opt-in";
-    formats: readonly ["text", "json"];
+    formats: readonly ["text", "json", "mermaid"];
     limits: typeof traceLimits;
     metadata: {
       default: "minimal";
@@ -112,7 +112,7 @@ export function getCapabilities(): Capabilities {
       {
         name: "capabilities",
         status: "available",
-        outputFormats: ["text", "json"]
+        outputFormats: ["text", "json", "mermaid"]
       },
       {
         name: "inspect",
@@ -150,7 +150,7 @@ export function getCapabilities(): Capabilities {
     tracing: {
       endpointTypes: ["flowNode", "sequenceFlow", "messageFlow"],
       followMessageFlows: "opt-in",
-      formats: ["text", "json"],
+      formats: ["text", "json", "mermaid"],
       limits: traceLimits,
       metadata: {
         default: "minimal",
@@ -180,7 +180,7 @@ BPMN mutation: not implemented
 Inspect views: model, process, scope, element
 Inspect formats: text, json, jsonl
 Trace modes: forward, backward, connecting
-Trace formats: text, json
+Trace formats: text, json, mermaid
 `;
 }
 

@@ -35,6 +35,9 @@ until its contract and safety properties are approved there.
 - Keep default output concise and summary-first. Large inventories, raw
   properties, and verbose diagnostics must require explicit inclusion or
   targeting.
+- Do not repeat source provenance, model hashes, profile details, or empty
+  diagnostics in targeted stdout responses. Expose them explicitly when needed
+  for verification or detached artifacts.
 - Prefer targeted retrieval (`get`, filtered `list`, bounded `trace`) over
   dumping an entire model into stdout.
 - Use stdout only for requested results and stderr only for diagnostics.
@@ -52,9 +55,14 @@ until its contract and safety properties are approved there.
 - Expose business behavior: processes, scopes, activities, control flow,
   gateways, conditions, events, handlers, communication, and execution
   metadata.
-- Do not expose moddle implementation details as public API.
+- Use `$type` and loaded descriptor property names deliberately as the stable
+  semantic contract; do not expose incidental moddle internals such as
+  `$model`, `$descriptor`, `$parent`, methods, or object identity.
 - Diagram Interchange is not business logic. Bounds, waypoints, labels, colors,
   and layout must not affect semantic inspection output.
+- Presentation-only extension data, including
+  `zeebe:modelerTemplateIcon`, must be excluded completely: it does not appear
+  in output, counts, diagnostics, or semantic hashes.
 - Semantic output for models that differ only in DI must be identical, except
   for source-byte metadata such as hashes and sizes.
 - Preserve modeled identifiers and expressions exactly. Do not invent IDs,

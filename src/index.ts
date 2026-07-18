@@ -4,6 +4,8 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 
+import { executeInspect, inspectLimits } from "./inspect.js";
+
 interface PackageManifest {
   version: string;
 }
@@ -21,7 +23,7 @@ export interface Writer {
 interface CapabilityCommand {
   name: string;
   status: "available" | "planned";
-  outputFormats?: readonly ["text", "json"];
+  outputFormats?: readonly ("text" | "json" | "jsonl")[];
 }
 
 export interface Capabilities {
@@ -29,13 +31,25 @@ export interface Capabilities {
   cli: {
     name: "bpmn-cli";
     version: string;
-    node: ">=20";
+    node: ">=20.12";
   };
   commands: readonly CapabilityCommand[];
   bpmn: {
-    parsing: false;
+    parsing: true;
     mutation: false;
     moddleExtensions: readonly string[];
+  };
+  inspection: {
+    views: readonly ["model", "process", "scope", "element"];
+    formats: readonly ["text", "json", "jsonl"];
+    profiles: readonly ["zeebe"];
+    customExtensions: true;
+    metadata: {
+      default: "minimal";
+      optIn: "--metadata";
+      outputFiles: "full";
+    };
+    paging: typeof inspectLimits;
   };
 }
 
@@ -51,13 +65,15 @@ Usage:
 
 Commands:
   capabilities      Show implemented and planned capabilities
+  inspect           Inspect bounded BPMN business semantics
+  help [command]    Show global or command-specific help
 
 Options:
   -h, --help       Display this help message
   -v, --version    Display the CLI version
 
-This is the Phase 0 foundation. BPMN inspection and editing commands will be
-added only after their contracts are approved in PLAN.md.
+Model mutation commands will be added only after their contracts are approved
+in PLAN.md. Run "bpmn-cli <command> --help" for command options.
 `;
 
 const capabilitiesHelpText = `Usage:
@@ -76,7 +92,7 @@ export function getCapabilities(): Capabilities {
     cli: {
       name: "bpmn-cli",
       version,
-      node: ">=20"
+      node: ">=20.12"
     },
     commands: [
       {
@@ -84,7 +100,11 @@ export function getCapabilities(): Capabilities {
         status: "available",
         outputFormats: ["text", "json"]
       },
-      { name: "inspect", status: "planned" },
+      {
+        name: "inspect",
+        status: "available",
+        outputFormats: ["text", "json", "jsonl"]
+      },
       { name: "validate", status: "planned" },
       { name: "plan", status: "planned" },
       { name: "diff", status: "planned" },
@@ -92,9 +112,21 @@ export function getCapabilities(): Capabilities {
       { name: "verify", status: "planned" }
     ],
     bpmn: {
-      parsing: false,
+      parsing: true,
       mutation: false,
-      moddleExtensions: []
+      moddleExtensions: ["zeebe"]
+    },
+    inspection: {
+      views: ["model", "process", "scope", "element"],
+      formats: ["text", "json", "jsonl"],
+      profiles: ["zeebe"],
+      customExtensions: true,
+      metadata: {
+        default: "minimal",
+        optIn: "--metadata",
+        outputFiles: "full"
+      },
+      paging: inspectLimits
     }
   };
 }
@@ -112,8 +144,10 @@ Node.js: ${capabilities.cli.node}
 Commands:
 ${commands}
 
-BPMN parsing: not implemented
+BPMN parsing: available
 BPMN mutation: not implemented
+Inspect views: model, process, scope, element
+Inspect formats: text, json, jsonl
 `;
 }
 
@@ -153,7 +187,23 @@ function invalidArguments(args: readonly string[]): CliResult {
   };
 }
 
-export function execute(args: readonly string[]): CliResult {
+async function executeHelp(args: readonly string[]): Promise<CliResult> {
+  if (args.length === 0) {
+    return { exitCode: 0, output: helpText, stream: "stdout" };
+  }
+
+  if (args.length === 1 && args[0] === "capabilities") {
+    return executeCapabilities(["--help"]);
+  }
+
+  if (args.length === 1 && args[0] === "inspect") {
+    return executeInspect(["--help"]);
+  }
+
+  return invalidArguments(["help", ...args]);
+}
+
+export async function execute(args: readonly string[]): Promise<CliResult> {
   if (args.length === 0) {
     return { exitCode: 0, output: helpText, stream: "stdout" };
   }
@@ -170,15 +220,23 @@ export function execute(args: readonly string[]): CliResult {
     return executeCapabilities(args.slice(1));
   }
 
+  if (args[0] === "help") {
+    return executeHelp(args.slice(1));
+  }
+
+  if (args[0] === "inspect") {
+    return executeInspect(args.slice(1));
+  }
+
   return invalidArguments(args);
 }
 
-export function run(
+export async function run(
   args: readonly string[],
   stdout: Writer = process.stdout,
   stderr: Writer = process.stderr
-): number {
-  const result = execute(args);
+): Promise<number> {
+  const result = await execute(args);
   (result.stream === "stdout" ? stdout : stderr).write(result.output);
   return result.exitCode;
 }
@@ -186,5 +244,5 @@ export function run(
 const invokedPath = process.argv[1];
 
 if (invokedPath && pathToFileURL(resolve(invokedPath)).href === import.meta.url) {
-  process.exitCode = run(process.argv.slice(2));
+  process.exitCode = await run(process.argv.slice(2));
 }

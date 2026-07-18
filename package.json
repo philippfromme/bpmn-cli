@@ -1,11 +1,11 @@
 {
   "name": "bpmn-cli",
   "version": "0.1.0",
-  "description": "A safe, scriptable foundation for future BPMN moddle editing.",
+  "description": "Agent-first, bounded inspection of BPMN business semantics.",
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.12"
   },
   "bin": {
     "bpmn-cli": "./dist/index.js"
@@ -17,8 +17,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
-    "test": "npm run build && node --test dist/index.test.js",
-    "test:coverage": "npm run build && node --test --experimental-test-coverage dist/index.test.js"
+    "test": "npm run build && node --test \"dist/*.test.js\"",
+    "test:coverage": "npm run build && node --test --experimental-test-coverage \"dist/*.test.js\""
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -26,5 +26,9 @@
     "eslint": "^9.39.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.0"
+  },
+  "dependencies": {
+    "bpmn-moddle": "^10.0.0",
+    "zeebe-bpmn-moddle": "^1.16.0"
   }
 }

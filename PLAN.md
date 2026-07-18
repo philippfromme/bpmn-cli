@@ -32,10 +32,10 @@ The bounded, descriptor-faithful inspection contract below is implemented.
 
 ### 2. Targeted path analysis
 
-**Status:** planned; Trace v1 contract approved, implementation not started.
+**Status:** complete.
 
-Implement the bounded, BPMN-native Trace v1 contract below. Do not begin safe
-mutation until its acceptance gate passes.
+The bounded, BPMN-native Trace v1 contract below is implemented. Safe mutation
+remains gated by its own approved contract.
 
 ### 3. Safe mutation
 
@@ -646,7 +646,8 @@ Branches, joins, and loops remain shared graph structure.
       }
     ],
     "participants": [],
-    "messageFlows": []
+    "messageFlows": [],
+    "rootElements": []
   },
   "analysis": {
     "frontierRefs": [],
@@ -667,6 +668,10 @@ Each scope:
   `$type`;
 - includes only relevant Lane summaries, preserving their filtered
   `flowNodeRef` values.
+
+`rootElements` contains only referenced semantic roots needed to interpret the
+emitted graph, such as Error, Escalation, Signal, and Message definitions. It
+does not duplicate Process or Collaboration containers.
 
 Do not introduce generic `nodes`, `edges`, or `transitions`. SequenceFlows keep
 `sourceRef`, `targetRef`, and exact `conditionExpression`; BoundaryEvents keep

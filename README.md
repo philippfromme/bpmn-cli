@@ -1,8 +1,8 @@
 # bpmn-cli
 
-Agent-first Node.js CLI for bounded, descriptor-faithful inspection of BPMN
-business semantics. Diagram Interchange, colors, and presentation-only modeler
-data are excluded.
+Agent-first Node.js CLI for bounded, descriptor-faithful inspection and trace
+analysis of BPMN business semantics. Diagram Interchange, colors, and
+presentation-only modeler data are excluded.
 
 Mutation is intentionally unavailable. Its contract remains gated by
 [PLAN.md](PLAN.md) and the agent-first principles in [AGENTS.md](AGENTS.md).
@@ -61,6 +61,34 @@ Properties use loaded moddle descriptor names. For example, output preserves
 `messageFlows`; references are IDs. Derived counts, context, diagnostics, and
 paging metadata are isolated under `analysis`, `context`, and `page`.
 
+## Agent trace workflow
+
+Trace modeled behavior forward, backward, or between two elements:
+
+```sh
+bpmn-cli trace "model.bpmn" --from Task_1 --json
+bpmn-cli trace "model.bpmn" --to EndEvent_1 --json
+bpmn-cli trace "model.bpmn" --from Gateway_1 --to Task_2 --json
+```
+
+Trace returns a reachable BPMN-native subgraph, not simulated execution or an
+enumeration of paths. It preserves exact SequenceFlow conditions, nested
+scopes, handlers, loops, relevant lanes/data/artifacts, and modeled event
+transitions. MessageFlows are shown when relevant but crossed only explicitly:
+
+```sh
+bpmn-cli trace "collaboration.bpmn" --to StartEvent_1 \
+  --follow-message-flows --json
+```
+
+The default budget is 50 unique semantic elements; the maximum is 100. Bounded
+results report deterministic `frontierRefs`. Complete output requires an
+offline artifact:
+
+```sh
+bpmn-cli trace "model.bpmn" --from Task_1 --all --json --output "trace.json"
+```
+
 ## Profiles and extensions
 
 The standard Zeebe namespace activates the bundled `zeebe-bpmn-moddle`
@@ -96,7 +124,7 @@ Scope JSONL emits independent scope, flow-element, artifact, and page records:
 bpmn-cli inspect "model.bpmn" --scope Process_1 --limit 25 --jsonl
 ```
 
-Complete semantic output is available only as an explicit offline artifact:
+Complete inspection output is available only as an explicit offline artifact:
 
 ```sh
 bpmn-cli inspect "model.bpmn" --process Process_1 --all --json --output "process.json"
@@ -114,10 +142,12 @@ JSON-pointer paths for addressing.
 ```sh
 bpmn-cli --help
 bpmn-cli inspect --help
+bpmn-cli trace --help
 bpmn-cli help inspect
+bpmn-cli help trace
 bpmn-cli capabilities --json
 ```
 
 Machine-readable results and errors use `schemaVersion: "1"`. `capabilities`
-distinguishes implemented inspection from planned validation and mutation
-commands.
+distinguishes implemented inspection and tracing from planned validation and
+mutation commands.

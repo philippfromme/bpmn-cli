@@ -26,6 +26,7 @@ test("renders discoverable global help", async () => {
     assert.match(result.output, /^bpmn-cli /);
     assert.match(result.output, /capabilities/);
     assert.match(result.output, /inspect/);
+    assert.match(result.output, /trace/);
     assert.match(result.output, /help \[command\]/);
     assert.match(result.output, /bpmn-cli <command> --help/);
     assert.match(result.output, /PLAN\.md/);
@@ -67,18 +68,37 @@ test("reports agent-discoverable capabilities", async () => {
       maxStdoutBytes: 32768
     }
   });
+  assert.deepEqual(capabilities.tracing, {
+    endpointTypes: ["flowNode", "sequenceFlow", "messageFlow"],
+    followMessageFlows: "opt-in",
+    formats: ["text", "json"],
+    limits: {
+      defaultElementBudget: 50,
+      maxElementBudget: 100,
+      maxStdoutBytes: 32768
+    },
+    metadata: {
+      default: "minimal",
+      optIn: "--metadata",
+      outputFiles: "full"
+    },
+    modes: ["forward", "backward", "connecting"]
+  });
   assert.match((await execute(["capabilities"])).output, /Inspect views:/);
 });
 
 test("renders command help through both forms", async () => {
   const capabilities = await execute(["help", "capabilities"]);
   const inspect = await execute(["help", "inspect"]);
+  const trace = await execute(["help", "trace"]);
 
   assert.match(capabilities.output, /bpmn-cli capabilities \[--json\]/);
   assert.match(inspect.output, /--scope <id>/);
   assert.match(inspect.output, /--extension/);
   assert.match(inspect.output, /--metadata/);
   assert.match(inspect.output, /32 KiB/);
+  assert.match(trace.output, /--follow-message-flows/);
+  assert.match(trace.output, /32 KiB/);
 
   for (const option of ["--help", "-h"]) {
     assert.match(

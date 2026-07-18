@@ -1,23 +1,11 @@
-import { constants } from "node:fs";
-import { createHash, randomUUID } from "node:crypto";
-import {
-  access,
-  link,
-  readFile,
-  rename,
-  rm,
-  stat,
-  writeFile
-} from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { createHash } from "node:crypto";
 import { parseArgs } from "node:util";
 
-import { BpmnModdle } from "bpmn-moddle";
-
 import {
-  ProfileError,
-  resolveProfiles
-} from "./profiles.js";
+  loadSemanticModel,
+  ModelLoadError
+} from "./model-loader.js";
+import { writeOutputFile } from "./output.js";
 import type { JsonObject, JsonValue } from "./project.js";
 import {
   createElementView,
@@ -25,7 +13,6 @@ import {
   createModelView,
   createProcessView,
   createScopeView,
-  createSemanticModel,
   type InspectionEnvelope,
   type SemanticModel
 } from "./semantic.js";
@@ -705,81 +692,6 @@ function selectView(
   return createElementView(model, options.selector.id, options.all);
 }
 
-async function writeOutput(
-  path: string,
-  contents: string,
-  force: boolean,
-  sourcePath: string
-): Promise<void> {
-  const resolved = resolve(path);
-  const resolvedSource = resolve(sourcePath);
-
-  if (resolved === resolvedSource) {
-    throw new Error("Output file must not be the BPMN source");
-  }
-
-  try {
-    const [outputStats, sourceStats] = await Promise.all([
-      stat(resolved),
-      stat(resolvedSource)
-    ]);
-
-    if (
-      outputStats.dev === sourceStats.dev &&
-      outputStats.ino === sourceStats.ino
-    ) {
-      throw new Error("Output file must not alias the BPMN source");
-    }
-  } catch (error) {
-    if (
-      !(
-        error instanceof Error &&
-        "code" in error &&
-        error.code === "ENOENT"
-      )
-    ) {
-      throw error;
-    }
-  }
-
-  if (!force) {
-    try {
-      await access(resolved, constants.F_OK);
-      throw new Error(`Output file already exists: ${path}`);
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        "code" in error &&
-        error.code === "ENOENT"
-      ) {
-        // Expected: writeFile with wx below claims the path atomically.
-      } else {
-        throw error;
-      }
-    }
-  }
-
-  const temporary = join(
-    dirname(resolved),
-    `.${basename(resolved)}.${randomUUID()}.tmp`
-  );
-
-  try {
-    await writeFile(temporary, contents, {
-      encoding: "utf8",
-      flag: "wx"
-    });
-
-    if (force) {
-      await rename(temporary, resolved);
-    } else {
-      await link(temporary, resolved);
-    }
-  } finally {
-    await rm(temporary, { force: true });
-  }
-}
-
 export async function executeInspect(
   args: readonly string[]
 ): Promise<InspectResult> {
@@ -794,70 +706,25 @@ export async function executeInspect(
   }
 
   const options = parsed;
-  let source: Buffer;
+  let model: SemanticModel;
 
   try {
-    source = await readFile(resolve(options.file));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return errorResult(
-      2,
-      "SOURCE_READ_FAILED",
-      `Unable to read BPMN file "${options.file}": ${message}`,
-      options.format
-    );
-  }
-
-  let xml: string;
-
-  try {
-    xml = new TextDecoder("utf-8", { fatal: true }).decode(source);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return errorResult(
-      2,
-      "SOURCE_DECODE_FAILED",
-      `Unable to decode BPMN file "${options.file}" as UTF-8: ${message}`,
-      options.format
-    );
-  }
-
-  let profiles;
-
-  try {
-    profiles = await resolveProfiles({
+    model = await loadSemanticModel({
       autoProfile: options.autoProfile,
       extensions: options.extensions,
-      profile: options.profile,
-      xml
+      file: options.file,
+      profile: options.profile
     });
   } catch (error) {
-    if (error instanceof ProfileError) {
+    if (error instanceof ModelLoadError) {
       return errorResult(
         error.exitCode,
-        "PROFILE_ERROR",
+        error.code,
         error.message,
         options.format
       );
     }
 
-    throw error;
-  }
-
-  let model: SemanticModel;
-
-  try {
-    const moddle = new BpmnModdle(profiles.packages);
-    const parsedBpmn = await moddle.fromXML(xml);
-    model = createSemanticModel({
-      definitions: parsedBpmn.rootElement,
-      disabledZeebe: profiles.declaresDisabledZeebe,
-      parseWarnings: parsedBpmn.warnings,
-      profiles: profiles.active,
-      sourceBytes: source,
-      sourcePath: options.file
-    });
-  } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return errorResult(
       3,
@@ -910,7 +777,7 @@ export async function executeInspect(
 
   if (options.output !== undefined) {
     try {
-      await writeOutput(options.output, output, options.force, options.file);
+      await writeOutputFile(options.output, output, options.force, options.file);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return errorResult(

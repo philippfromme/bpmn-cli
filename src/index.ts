@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 
 import { executeInspect, inspectLimits } from "./inspect.js";
+import { executeTrace, traceLimits } from "./trace.js";
 
 interface PackageManifest {
   version: string;
@@ -51,6 +52,18 @@ export interface Capabilities {
     };
     paging: typeof inspectLimits;
   };
+  tracing: {
+    endpointTypes: readonly ["flowNode", "sequenceFlow", "messageFlow"];
+    followMessageFlows: "opt-in";
+    formats: readonly ["text", "json"];
+    limits: typeof traceLimits;
+    metadata: {
+      default: "minimal";
+      optIn: "--metadata";
+      outputFiles: "full";
+    };
+    modes: readonly ["forward", "backward", "connecting"];
+  };
 }
 
 const require = createRequire(import.meta.url);
@@ -66,6 +79,7 @@ Usage:
 Commands:
   capabilities      Show implemented and planned capabilities
   inspect           Inspect bounded BPMN business semantics
+  trace             Trace bounded BPMN business behavior
   help [command]    Show global or command-specific help
 
 Options:
@@ -105,6 +119,11 @@ export function getCapabilities(): Capabilities {
         status: "available",
         outputFormats: ["text", "json", "jsonl"]
       },
+      {
+        name: "trace",
+        status: "available",
+        outputFormats: ["text", "json"]
+      },
       { name: "validate", status: "planned" },
       { name: "plan", status: "planned" },
       { name: "diff", status: "planned" },
@@ -127,6 +146,18 @@ export function getCapabilities(): Capabilities {
         outputFiles: "full"
       },
       paging: inspectLimits
+    },
+    tracing: {
+      endpointTypes: ["flowNode", "sequenceFlow", "messageFlow"],
+      followMessageFlows: "opt-in",
+      formats: ["text", "json"],
+      limits: traceLimits,
+      metadata: {
+        default: "minimal",
+        optIn: "--metadata",
+        outputFiles: "full"
+      },
+      modes: ["forward", "backward", "connecting"]
     }
   };
 }
@@ -148,6 +179,8 @@ BPMN parsing: available
 BPMN mutation: not implemented
 Inspect views: model, process, scope, element
 Inspect formats: text, json, jsonl
+Trace modes: forward, backward, connecting
+Trace formats: text, json
 `;
 }
 
@@ -200,6 +233,10 @@ async function executeHelp(args: readonly string[]): Promise<CliResult> {
     return executeInspect(["--help"]);
   }
 
+  if (args.length === 1 && args[0] === "trace") {
+    return executeTrace(["--help"]);
+  }
+
   return invalidArguments(["help", ...args]);
 }
 
@@ -226,6 +263,10 @@ export async function execute(args: readonly string[]): Promise<CliResult> {
 
   if (args[0] === "inspect") {
     return executeInspect(args.slice(1));
+  }
+
+  if (args[0] === "trace") {
+    return executeTrace(args.slice(1));
   }
 
   return invalidArguments(args);

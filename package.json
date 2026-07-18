@@ -1,7 +1,7 @@
 {
   "name": "bpmn-cli",
   "version": "0.1.0",
-  "description": "Agent-first, bounded inspection of BPMN business semantics.",
+  "description": "Agent-first, bounded inspection and trace analysis of BPMN business semantics.",
   "private": true,
   "type": "module",
   "engines": {

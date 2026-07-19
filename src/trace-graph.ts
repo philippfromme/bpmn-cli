@@ -1299,59 +1299,84 @@ function sequenceFlowCycles(
   const onStack = new Set<ModdleElement>();
   const components: ModdleElement[][] = [];
 
-  const connect = (node: ModdleElement): void => {
+  const discover = (node: ModdleElement): void => {
     indexes.set(node, index);
     lowLinks.set(node, index);
     index += 1;
     stack.push(node);
     onStack.add(node);
-
-    for (const adjacent of adjacency.get(node) ?? []) {
-      if (!indexes.has(adjacent)) {
-        connect(adjacent);
-        lowLinks.set(
-          node,
-          Math.min(
-            lowLinks.get(node) as number,
-            lowLinks.get(adjacent) as number
-          )
-        );
-      } else if (onStack.has(adjacent)) {
-        lowLinks.set(
-          node,
-          Math.min(
-            lowLinks.get(node) as number,
-            indexes.get(adjacent) as number
-          )
-        );
-      }
-    }
-
-    if (lowLinks.get(node) === indexes.get(node)) {
-      const component: ModdleElement[] = [];
-      let member: ModdleElement;
-
-      do {
-        member = stack.pop() as ModdleElement;
-        onStack.delete(member);
-        component.push(member);
-      } while (member !== node);
-
-      const selfLoop =
-        component.length === 1 &&
-        (adjacency.get(component[0] as ModdleElement) ?? []).includes(
-          component[0] as ModdleElement
-        );
-
-      if (component.length > 1 || selfLoop) {
-        components.push(component);
-      }
-    }
   };
 
   for (const node of nodes) {
     if (!indexes.has(node)) {
-      connect(node);
+      discover(node);
+      const frames: Array<{
+        nextAdjacentIndex: number;
+        node: ModdleElement;
+      }> = [{ node, nextAdjacentIndex: 0 }];
+
+      while (frames.length > 0) {
+        const frame = frames[frames.length - 1] as {
+          nextAdjacentIndex: number;
+          node: ModdleElement;
+        };
+        const adjacent = adjacency.get(frame.node) ?? [];
+
+        if (frame.nextAdjacentIndex < adjacent.length) {
+          const candidate = adjacent[frame.nextAdjacentIndex] as ModdleElement;
+          frame.nextAdjacentIndex += 1;
+
+          if (!indexes.has(candidate)) {
+            discover(candidate);
+            frames.push({ node: candidate, nextAdjacentIndex: 0 });
+          } else if (onStack.has(candidate)) {
+            lowLinks.set(
+              frame.node,
+              Math.min(
+                lowLinks.get(frame.node) as number,
+                indexes.get(candidate) as number
+              )
+            );
+          }
+
+          continue;
+        }
+
+        frames.pop();
+
+        if (lowLinks.get(frame.node) === indexes.get(frame.node)) {
+          const component: ModdleElement[] = [];
+          let member: ModdleElement;
+
+          do {
+            member = stack.pop() as ModdleElement;
+            onStack.delete(member);
+            component.push(member);
+          } while (member !== frame.node);
+
+          const selfLoop =
+            component.length === 1 &&
+            (adjacency.get(component[0] as ModdleElement) ?? []).includes(
+              component[0] as ModdleElement
+            );
+
+          if (component.length > 1 || selfLoop) {
+            components.push(component);
+          }
+        }
+
+        const parent = frames[frames.length - 1];
+
+        if (parent !== undefined) {
+          lowLinks.set(
+            parent.node,
+            Math.min(
+              lowLinks.get(parent.node) as number,
+              lowLinks.get(frame.node) as number
+            )
+          );
+        }
+      }
     }
   }
 

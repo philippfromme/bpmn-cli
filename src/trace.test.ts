@@ -112,6 +112,47 @@ function terminatedSubprocessModel(
 `;
 }
 
+function linearTraceModel(taskCount: number): string {
+  const tasks = Array.from({ length: taskCount }, (_, index) => {
+    const incoming = index === 0
+      ? "Flow_Start_0"
+      : `Flow_${index - 1}_${index}`;
+    const outgoing = index === taskCount - 1
+      ? "Flow_Last_End"
+      : `Flow_${index}_${index + 1}`;
+
+    return `    <bpmn:task id="Task_${index}">
+      <bpmn:incoming>${incoming}</bpmn:incoming>
+      <bpmn:outgoing>${outgoing}</bpmn:outgoing>
+    </bpmn:task>`;
+  }).join("\n");
+  const flows = [
+    '    <bpmn:sequenceFlow id="Flow_Start_0" sourceRef="Start_Large" targetRef="Task_0" />',
+    ...Array.from(
+      { length: taskCount - 1 },
+      (_, index) =>
+        `    <bpmn:sequenceFlow id="Flow_${index}_${index + 1}" sourceRef="Task_${index}" targetRef="Task_${index + 1}" />`
+    ),
+    `    <bpmn:sequenceFlow id="Flow_Last_End" sourceRef="Task_${taskCount - 1}" targetRef="End_Large" />`
+  ].join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  targetNamespace="https://example.test">
+  <bpmn:process id="Process_Large">
+    <bpmn:startEvent id="Start_Large">
+      <bpmn:outgoing>Flow_Start_0</bpmn:outgoing>
+    </bpmn:startEvent>
+${tasks}
+    <bpmn:endEvent id="End_Large">
+      <bpmn:incoming>Flow_Last_End</bpmn:incoming>
+    </bpmn:endEvent>
+${flows}
+  </bpmn:process>
+</bpmn:definitions>
+`;
+}
+
 function flowElements(document: {
   trace: {
     scopes: Array<{ flowElements: Array<Record<string, unknown>> }>;
@@ -859,23 +900,49 @@ test("reports SequenceFlow cycles separately from activity loops", async (contex
 </bpmn:definitions>`
   );
 
-  const document = JSON.parse(
-    (await trace([bpmn, "--from", "Task_A", "--json"])).output
-  );
+  const first = await trace([bpmn, "--from", "Task_A", "--json"]);
+  const second = await trace([bpmn, "--from", "Task_A", "--json"]);
+  const document = JSON.parse(first.output);
 
   assert.deepEqual(
-    new Set(document.analysis.sequenceFlowCycles[0].flowElementRefs),
-    new Set(["Task_A", "Task_B"])
+    document.analysis.sequenceFlowCycles,
+    [{
+      scopeRef: "Process_Loops",
+      flowElementRefs: ["Task_B", "Task_A"],
+      sequenceFlowRefs: ["Flow_BA", "Flow_AB"]
+    }]
   );
-  assert.deepEqual(
-    new Set(document.analysis.sequenceFlowCycles[0].sequenceFlowRefs),
-    new Set(["Flow_AB", "Flow_BA"])
-  );
+  assert.equal(second.output, first.output);
   assert.equal(document.analysis.activityLoops[0].elementRef, "Task_A");
   assert.equal(
     document.analysis.activityLoops[0].loopCharacteristics.$type,
     "bpmn:MultiInstanceLoopCharacteristics"
   );
+});
+
+test("traces a large acyclic model without stack overflow", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "bpmn-cli-trace-large-"));
+  const bpmn = join(directory, "large.bpmn");
+  const output = join(directory, "trace.json");
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(bpmn, linearTraceModel(7000));
+
+  const result = await trace([
+    bpmn,
+    "--from",
+    "Start_Large",
+    "--all",
+    "--json",
+    "--output",
+    output
+  ]);
+  const document = JSON.parse(await readFile(output, "utf8"));
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(document.trace.mode, "forward");
+  assert.equal(document.analysis.truncated, false);
+  assert.equal(document.analysis.sequenceFlowCycles, undefined);
+  assert.ok(document.analysis.endEventRefs.includes("End_Large"));
 });
 
 test("resolves Link transfers without inventing SequenceFlows", async (context) => {

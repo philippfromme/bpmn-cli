@@ -231,8 +231,12 @@ bpmn-cli inspect "model.bpmn" --process Process_1 --all --json --output "process
 bpmn-cli inspect "model.bpmn" --process Process_1 --all --jsonl --output "process.jsonl"
 ```
 
-Output files are published atomically, never overwrite the BPMN source or a
-same-file alias, and require `--force` before replacing an existing artifact.
+Output files are atomically published where the destination filesystem supports
+hard links. Filesystems without hard-link support use exclusive creation instead:
+they still never overwrite an existing destination, but a reader can observe the
+new artifact while it is being written. Output files never overwrite the BPMN
+source or a same-file alias and require `--force` before replacing an existing
+artifact.
 They always include full provenance metadata.
 Full JSONL element records retain complete semantic values and include stable
 JSON-pointer paths for addressing.

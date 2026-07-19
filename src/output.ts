@@ -1,15 +1,50 @@
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
+import * as fs from "node:fs/promises";
 import {
   access,
   chmod,
-  link,
   rename,
   rm,
   stat,
   writeFile
 } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
+
+const HARD_LINK_UNSUPPORTED_CODES = new Set([
+  "ENOTSUP",
+  "EOPNOTSUPP",
+  "EPERM"
+]);
+
+function isHardLinkUnsupported(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    HARD_LINK_UNSUPPORTED_CODES.has(error.code)
+  );
+}
+
+export async function publishNewOutput(
+  temporary: string,
+  resolved: string,
+  contents: string,
+  linkOutput: typeof fs.link = fs.link
+): Promise<void> {
+  try {
+    await linkOutput(temporary, resolved);
+  } catch (error) {
+    if (!isHardLinkUnsupported(error)) {
+      throw error;
+    }
+
+    await writeFile(resolved, contents, {
+      encoding: "utf8",
+      flag: "wx"
+    });
+  }
+}
 
 export async function writeOutputFile(
   path: string,
@@ -83,7 +118,7 @@ export async function writeOutputFile(
     if (force) {
       await rename(temporary, resolved);
     } else {
-      await link(temporary, resolved);
+      await publishNewOutput(temporary, resolved, contents);
     }
   } finally {
     await rm(temporary, { force: true });

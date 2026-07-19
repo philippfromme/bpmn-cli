@@ -1,8 +1,18 @@
 {
-  "name": "bpmn-cli",
+  "name": "@philippfromme/bpmn-cli",
   "version": "0.1.0",
   "description": "Agent-first inspection, tracing, safe editing, linting, semantic diffing, and layout for BPMN.",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/philippfromme/bpmn-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/philippfromme/bpmn-cli/issues"
+  },
+  "homepage": "https://github.com/philippfromme/bpmn-cli#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "engines": {
     "node": ">=20.12"

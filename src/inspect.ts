@@ -740,12 +740,24 @@ export async function executeInspect(
     envelope = selectView(model, options);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const code = message.startsWith("Stale")
-      ? "STALE_CURSOR"
-      : message.includes("output budget")
-        ? "OUTPUT_TOO_LARGE"
-        : "INVALID_CURSOR";
-    return errorResult(1, code, message, options.format);
+    if (message.startsWith("Stale")) {
+      return errorResult(1, "STALE_CURSOR", message, options.format);
+    }
+
+    if (message === "Invalid scope cursor") {
+      return errorResult(1, "INVALID_CURSOR", message, options.format);
+    }
+
+    if (message.includes("output budget")) {
+      return errorResult(1, "OUTPUT_TOO_LARGE", message, options.format);
+    }
+
+    return errorResult(
+      3,
+      "INSPECTION_FAILED",
+      `Unable to construct inspection result: ${message}`,
+      options.format
+    );
   }
 
   if (envelope === undefined) {

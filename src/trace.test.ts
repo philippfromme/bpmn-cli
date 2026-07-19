@@ -27,6 +27,31 @@ async function trace(args: readonly string[]) {
   return execute(["trace", ...args]);
 }
 
+function genericExtensionModel(): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:vendor="https://example.test/vendor" targetNamespace="https://example.test">
+  <bpmn:process id="Process_Generic">
+    <bpmn:startEvent id="Start_Generic">
+      <bpmn:outgoing>Flow_Start_Task</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_Generic">
+      <bpmn:incoming>Flow_Start_Task</bpmn:incoming>
+      <bpmn:outgoing>Flow_Task_End</bpmn:outgoing>
+      <bpmn:extensionElements>
+        <vendor:approvalPolicy mode="four-eyes" />
+      </bpmn:extensionElements>
+    </bpmn:task>
+    <bpmn:endEvent id="End_Generic">
+      <bpmn:incoming>Flow_Task_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start_Task" sourceRef="Start_Generic" targetRef="Task_Generic" />
+    <bpmn:sequenceFlow id="Flow_Task_End" sourceRef="Task_Generic" targetRef="End_Generic" />
+  </bpmn:process>
+</bpmn:definitions>
+`;
+}
+
 function flowElements(document: {
   trace: {
     scopes: Array<{ flowElements: Array<Record<string, unknown>> }>;
@@ -91,6 +116,32 @@ test("traces a real boundary handler and scope-level event subprocess", async ()
   );
   assert.ok(document.analysis.endEventRefs.includes("Event_0pcdb7p"));
   assert.doesNotMatch(result.output, /modelerTemplateIcon|data:image/);
+});
+
+test("traces generic extension elements without an internal error", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "bpmn-cli-generic-extension-"));
+  const bpmn = join(directory, "generic-extension.bpmn");
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(bpmn, genericExtensionModel());
+
+  const result = await trace([bpmn, "--from", "Start_Generic", "--json"]);
+  const document = JSON.parse(result.output);
+  const ids = new Set(
+    flowElements(document).map(({ id }: { id?: string }) => id)
+  );
+
+  assert.equal(result.exitCode, 0);
+  assert.ok(ids.has("Start_Generic"));
+  assert.ok(ids.has("Task_Generic"));
+  assert.ok(ids.has("End_Generic"));
+  assert.ok(
+    document.analysis.diagnostics.some(
+      ({ code, message }: Record<string, string>) =>
+        code === "UNSUPPORTED_EXTENSION_DATA" &&
+        typeof message === "string" &&
+        message.includes("vendor:approvalPolicy")
+    )
+  );
 });
 
 test("returns an exact connecting route and branch condition", async () => {

@@ -382,7 +382,13 @@ export async function executeTrace(
         return errorResult(1, error.code, error.message, options.format);
       }
 
-      throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      return errorResult(
+        3,
+        "TRACE_FAILED",
+        `Unable to construct trace: ${message}`,
+        options.format
+      );
     }
 
     const output = serialize(envelope, options);

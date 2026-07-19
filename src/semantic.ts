@@ -4,10 +4,10 @@ import type {
   BpmnModdle,
   Definitions,
   ModdleElement,
-  ModdleParseWarning,
-  ModdlePropertyDescriptor
+  ModdleParseWarning
 } from "bpmn-moddle";
 
+import { typedDescriptorProperties } from "./moddle.js";
 import type { ActiveProfile } from "./profiles.js";
 import {
   classifyProperty,
@@ -95,7 +95,7 @@ function isModdleElement(value: unknown): value is ModdleElement {
 
 function containedChildren(
   element: ModdleElement,
-  property: ModdlePropertyDescriptor
+  property: ReturnType<typeof typedDescriptorProperties>[number]
 ): ModdleElement[] {
   if (property.isReference) {
     return [];
@@ -122,13 +122,7 @@ function collectElements(root: ModdleElement): ModdleElement[] {
     visited.add(element);
     elements.push(element);
 
-    const properties = element.$descriptor.properties;
-
-    if (!Array.isArray(properties)) {
-      return;
-    }
-
-    for (const property of properties) {
+    for (const property of typedDescriptorProperties(element)) {
       for (const child of containedChildren(element, property)) {
         visit(child);
       }
@@ -181,7 +175,7 @@ export function createSemanticModel(options: {
       const property = warning.property.includes(":")
         ? warning.property.slice(warning.property.indexOf(":") + 1)
         : warning.property;
-      const descriptor = warning.element.$descriptor.properties.find(
+      const descriptor = typedDescriptorProperties(warning.element).find(
         ({ name }) => name === property
       );
       const current = warning.element.get(property);
@@ -384,7 +378,7 @@ function referenceElements(element: ModdleElement): ModdleElement[] {
 
     visited.add(current);
 
-    for (const property of current.$descriptor.properties) {
+    for (const property of typedDescriptorProperties(current)) {
       const value = current.get(property.name);
 
       if (property.isReference) {
@@ -727,7 +721,7 @@ function projectedPropertyValue(
   element: ModdleElement,
   propertyName: string
 ): JsonValue | undefined {
-  const property = element.$descriptor.properties.find(
+  const property = typedDescriptorProperties(element).find(
     ({ name }) => name === propertyName
   );
 

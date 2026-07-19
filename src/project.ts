@@ -5,6 +5,8 @@ import type {
   ModdlePropertyDescriptor
 } from "bpmn-moddle";
 
+import { typedDescriptorProperties } from "./moddle.js";
+
 export type JsonPrimitive = boolean | number | string | null;
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
 export interface JsonObject {
@@ -234,7 +236,7 @@ export function projectElement(
 
     const result: JsonObject = { $type: current.$type };
 
-    for (const property of current.$descriptor.properties) {
+    for (const property of typedDescriptorProperties(current)) {
       if (options.omitProperties?.has(property.name)) {
         continue;
       }
@@ -386,7 +388,7 @@ export function descriptorCoverage(
   }>();
 
   for (const element of elements) {
-    for (const property of element.$descriptor.properties) {
+    for (const property of typedDescriptorProperties(element)) {
       const key = `${element.$type}#${property.name}`;
       coverage.set(key, {
         classification: classifyProperty(element, property),

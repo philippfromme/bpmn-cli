@@ -1,5 +1,6 @@
 import type { ModdleElement } from "bpmn-moddle";
 
+import { typedDescriptorProperties } from "./moddle.js";
 import {
   projectElement,
   type JsonObject,
@@ -871,7 +872,7 @@ function referencedRootElements(
 
     visited.add(element);
 
-    for (const property of element.$descriptor.properties) {
+    for (const property of typedDescriptorProperties(element)) {
       const values = referenceArray(element, property.name);
 
       if (property.isReference) {
@@ -913,7 +914,7 @@ function relatedReferences(
 
     visited.add(element);
 
-    for (const property of element.$descriptor.properties) {
+    for (const property of typedDescriptorProperties(element)) {
       const value = element.get(property.name);
       const values = Array.isArray(value) ? value : [value];
 

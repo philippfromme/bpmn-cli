@@ -27,6 +27,31 @@ async function inspect(args: readonly string[]) {
   return execute(["inspect", ...args]);
 }
 
+function genericExtensionModel(): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:vendor="https://example.test/vendor" targetNamespace="https://example.test">
+  <bpmn:process id="Process_Generic">
+    <bpmn:startEvent id="Start_Generic">
+      <bpmn:outgoing>Flow_Start_Task</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_Generic">
+      <bpmn:incoming>Flow_Start_Task</bpmn:incoming>
+      <bpmn:outgoing>Flow_Task_End</bpmn:outgoing>
+      <bpmn:extensionElements>
+        <vendor:approvalPolicy mode="four-eyes" />
+      </bpmn:extensionElements>
+    </bpmn:task>
+    <bpmn:endEvent id="End_Generic">
+      <bpmn:incoming>Flow_Task_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start_Task" sourceRef="Start_Generic" targetRef="Task_Generic" />
+    <bpmn:sequenceFlow id="Flow_Task_End" sourceRef="Task_Generic" targetRef="End_Generic" />
+  </bpmn:process>
+</bpmn:definitions>
+`;
+}
+
 test("returns a bounded catalog for the complex Camunda 8 fixture", async () => {
   const result = await inspect([fixture, "--json"]);
   const document = JSON.parse(result.output);
@@ -727,6 +752,56 @@ test("preserves unsupported semantic attributes but excludes presentation attrib
         property === "foo:businessKey"
     )
   );
+});
+
+test("inspects generic extension elements without treating them as cursor errors", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "bpmn-cli-generic-extension-"));
+  const bpmn = join(directory, "generic-extension.bpmn");
+  const output = join(directory, "process.json");
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(bpmn, genericExtensionModel());
+
+  const elementResult = await inspect([
+    bpmn,
+    "--element",
+    "Task_Generic",
+    "--json"
+  ]);
+  const processResult = await inspect([
+    bpmn,
+    "--process",
+    "Process_Generic",
+    "--json"
+  ]);
+  const completeResult = await inspect([
+    bpmn,
+    "--process",
+    "Process_Generic",
+    "--all",
+    "--output",
+    output,
+    "--json"
+  ]);
+  const documents = [
+    JSON.parse(elementResult.output),
+    JSON.parse(processResult.output),
+    JSON.parse(await readFile(output, "utf8"))
+  ];
+
+  assert.equal(elementResult.exitCode, 0);
+  assert.equal(processResult.exitCode, 0);
+  assert.equal(completeResult.exitCode, 0);
+
+  for (const document of documents) {
+    assert.ok(
+      document.analysis.diagnostics.some(
+        ({ code, message }: Record<string, string>) =>
+          code === "UNSUPPORTED_EXTENSION_DATA" &&
+          typeof message === "string" &&
+          message.includes("vendor:approvalPolicy")
+      )
+    );
+  }
 });
 
 test("keeps semantic hashes invariant for DI and excluded presentation data", async (context) => {

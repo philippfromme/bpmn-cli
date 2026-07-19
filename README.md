@@ -4,6 +4,9 @@ Agent-first Node.js CLI for bounded BPMN inspection, tracing, safe editing,
 linting, semantic diffing, and layout. Business-semantic operations exclude
 Diagram Interchange, colors, and presentation-only modeler data.
 
+For a human-oriented explanation of the CLI's model, commands, and safe edit
+workflow, see the [overview](docs/overview.md).
+
 ## Requirements
 
 - Node.js 20.12 or later

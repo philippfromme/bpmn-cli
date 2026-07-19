@@ -155,12 +155,17 @@ preview, apply fails with `STALE_PLAN`. Create and review a new preview; do not
 guess or alter the hash.
 
 For a trusted, non-review workflow, `--apply-unreviewed` runs the same validation,
-serialization, layout, reload verification, and atomic publication in one
+serialization, layout, reload verification, and atomic BPMN publication in one
 invocation. It skips only external plan review and writes in place by default:
 
 ```sh
 bpmn-cli edit model.bpmn --request rename.json --apply-unreviewed --json
 ```
+
+`--report` writes a separate artifact, so it cannot share the BPMN file's atomic
+commit. If the report fails after BPMN publication, `edit` exits nonzero with
+`REPORT_WRITE_FAILED` and returns a `publication` record that confirms the
+written BPMN destination and SHA-256.
 
 Use it only when the request's preconditions fully express the expected source
 state; structural edits and unexpected derived effects are safer to preview.

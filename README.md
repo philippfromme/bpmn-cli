@@ -130,11 +130,16 @@ bpmn-cli edit "model.bpmn" --request "edit.json" \
 
 For a trusted, non-review workflow, `--apply-unreviewed` performs the same request
 validation, structural checks, layout, reload verification, and atomic
-publication in one invocation. It writes in place unless `--output` is given:
+BPMN publication in one invocation. It writes in place unless `--output` is given:
 
 ```sh
 bpmn-cli edit "model.bpmn" --request "edit.json" --apply-unreviewed --json
 ```
+
+When `--report` is requested, the report is a separate artifact and cannot be
+committed atomically with the BPMN file. If report publication fails after the
+BPMN commit, the command exits nonzero with a `REPORT_WRITE_FAILED` error whose
+`publication` record confirms the written BPMN destination and SHA-256.
 
 Edit supports `add`, `remove`, `replace`, and `move` over loaded BPMN, Zeebe,
 and custom moddle descriptors. Auto-layout is the default; `--no-layout`

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 
 import { BpmnModdle } from "bpmn-moddle";
@@ -263,6 +264,100 @@ test("does not publish a success report when BPMN publication fails", async () =
 
     assert.equal(result.exitCode, 2);
     assert.equal(await readFile(output, "utf8"), "occupied");
+    await assert.rejects(readFile(report), /ENOENT/);
+  });
+});
+
+test("reports an in-place BPMN commit when report publication fails", async () => {
+  await withFiles(async ({ source, request }) => {
+    const before = await readFile(source, "utf8");
+    const report = join(dirname(source), "missing", "report.json");
+
+    const result = await executeEdit([
+      source,
+      "--request",
+      request,
+      "--no-layout",
+      "--apply-unreviewed",
+      "--report",
+      report,
+      "--json"
+    ]);
+    const document = JSON.parse(result.output) as {
+      error: {
+        code: string;
+        publication: {
+          bpmn: {
+            destination: string;
+            outputSha256: string;
+            status: string;
+          };
+          report: { status: string };
+        };
+      };
+    };
+    const after = await readFile(source);
+
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.stream, "stderr");
+    assert.equal(document.error.code, "REPORT_WRITE_FAILED");
+    assert.deepEqual(document.error.publication, {
+      bpmn: {
+        destination: source,
+        outputSha256: createHash("sha256").update(after).digest("hex"),
+        status: "written"
+      },
+      report: { status: "failed" }
+    });
+    assert.notEqual(after.toString("utf8"), before);
+    await assert.rejects(readFile(report), /ENOENT/);
+  });
+});
+
+test("reports a separate BPMN commit when report publication fails", async () => {
+  await withFiles(async ({ source, request, output }) => {
+    const before = await readFile(source);
+    const report = join(dirname(source), "missing", "report.json");
+
+    const result = await executeEdit([
+      source,
+      "--request",
+      request,
+      "--no-layout",
+      "--apply-unreviewed",
+      "--output",
+      output,
+      "--report",
+      report,
+      "--json"
+    ]);
+    const document = JSON.parse(result.output) as {
+      error: {
+        code: string;
+        publication: {
+          bpmn: {
+            destination: string;
+            outputSha256: string;
+            status: string;
+          };
+          report: { status: string };
+        };
+      };
+    };
+    const written = await readFile(output);
+
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.stream, "stderr");
+    assert.equal(document.error.code, "REPORT_WRITE_FAILED");
+    assert.deepEqual(document.error.publication, {
+      bpmn: {
+        destination: output,
+        outputSha256: createHash("sha256").update(written).digest("hex"),
+        status: "written"
+      },
+      report: { status: "failed" }
+    });
+    assert.deepEqual(await readFile(source), before);
     await assert.rejects(readFile(report), /ENOENT/);
   });
 });

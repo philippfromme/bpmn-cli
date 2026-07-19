@@ -68,6 +68,24 @@ interface EditPlan {
   planHash: string;
 }
 
+interface BpmnPublication {
+  destination: string;
+  outputSha256: string;
+  status: "written";
+}
+
+interface EditPublicationState {
+  bpmn: BpmnPublication;
+  report: {
+    status: "failed";
+  };
+}
+
+interface ErrorResultOptions {
+  details?: JsonValue;
+  publication?: EditPublicationState;
+}
+
 interface PackageManifest {
   version: string;
 }
@@ -117,7 +135,7 @@ function errorResult(
   code: string,
   message: string,
   json: boolean,
-  details?: JsonValue
+  options: ErrorResultOptions = {}
 ): EditCommandResult {
   return json
     ? {
@@ -128,7 +146,10 @@ function errorResult(
             code,
             exitCode,
             message,
-            ...(details === undefined ? {} : { details })
+            ...(options.details === undefined ? {} : { details: options.details }),
+            ...(options.publication === undefined
+              ? {}
+              : { publication: options.publication })
           }
         })}\n`,
         stream: "stderr"
@@ -562,6 +583,8 @@ export async function executeEdit(
       );
     }
 
+    let bpmnPublication: BpmnPublication | undefined;
+
     if (writesBpmn(options)) {
       try {
         if (options.output === undefined) {
@@ -574,6 +597,11 @@ export async function executeEdit(
             options.file
           );
         }
+        bpmnPublication = {
+          destination: options.output ?? options.file,
+          outputSha256: sha256(plan.finalXml),
+          status: "written"
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return errorResult(
@@ -597,11 +625,20 @@ export async function executeEdit(
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        const publication = bpmnPublication === undefined
+          ? undefined
+          : {
+              bpmn: bpmnPublication,
+              report: { status: "failed" as const }
+            };
         return errorResult(
           2,
           "REPORT_WRITE_FAILED",
-          `Unable to write edit report: ${message}`,
-          options.json
+          bpmnPublication === undefined
+            ? `Unable to write edit report: ${message}`
+            : `Edited BPMN was written to "${bpmnPublication.destination}", but the edit report could not be written: ${message}`,
+          options.json,
+          { publication }
         );
       }
     }
@@ -627,7 +664,7 @@ export async function executeEdit(
         error.code,
         error.message,
         options.json,
-        error.details
+        { details: error.details }
       );
     }
 
@@ -637,7 +674,7 @@ export async function executeEdit(
         error.code,
         error.message,
         options.json,
-        error.details
+        { details: error.details }
       );
     }
 

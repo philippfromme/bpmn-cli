@@ -14,6 +14,8 @@ Use `bpmn-cli` as the semantic interface to BPMN. Do not hand-edit BPMN XML.
   never guess them from XML.
 - Treat `lint` as policy analysis, separate from edit structural safety.
 - Start edits with a preview. Apply only the exact `planHash` from that preview.
+   For a trusted non-review workflow, `--apply-unreviewed` is allowed: it keeps all
+   validation and verification but publishes atomically without external review.
 - Prefer `--output <new-file.bpmn>` for applies. It keeps the source unchanged.
 - Use the same profile, custom extensions, and layout mode for preview and
   apply. A mismatch makes the plan stale.

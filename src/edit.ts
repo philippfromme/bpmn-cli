@@ -49,6 +49,7 @@ export interface EditCommandResult {
 
 interface EditOptions {
   apply?: string;
+  applyUnreviewed: boolean;
   autoProfile: boolean;
   extensions: string[];
   file: string;
@@ -83,6 +84,7 @@ plan hash returned by preview.
 
 Approval:
   --apply <plan-hash>     Apply exactly the recomputed preview
+  --apply-unreviewed      Validate, verify, and write without external preview review
   --no-layout             Remove DI instead of applying greenfield layout
 
 Profiles:
@@ -98,11 +100,16 @@ Output:
   --json                  Emit versioned JSON
   -h, --help              Display this help message
 
-Preview never writes BPMN. Auto-layout is the default.
+Preview never writes BPMN. --apply-unreviewed writes atomically after the same
+validation and verification. Auto-layout is the default.
 `;
 
 function sha256(value: Buffer | string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function writesBpmn(options: EditOptions): boolean {
+  return options.apply !== undefined || options.applyUnreviewed;
 }
 
 function errorResult(
@@ -145,6 +152,7 @@ function parseEditOptions(
       strict: true,
       options: {
         apply: { type: "string" },
+        "apply-unreviewed": { type: "boolean" },
         extension: { type: "string", multiple: true },
         force: { type: "boolean" },
         help: { type: "boolean", short: "h" },
@@ -192,8 +200,16 @@ function parseEditOptions(
       throw new Error(`unknown profile: ${parsed.values.profile}`);
     }
 
-    if (parsed.values.output !== undefined && parsed.values.apply === undefined) {
-      throw new Error("--output requires --apply");
+    if (parsed.values.apply !== undefined && parsed.values["apply-unreviewed"]) {
+      throw new Error("--apply and --apply-unreviewed cannot be combined");
+    }
+
+    if (
+      parsed.values.output !== undefined &&
+      parsed.values.apply === undefined &&
+      !parsed.values["apply-unreviewed"]
+    ) {
+      throw new Error("--output requires --apply or --apply-unreviewed");
     }
 
     if (
@@ -206,6 +222,7 @@ function parseEditOptions(
 
     return {
       apply: parsed.values.apply,
+      applyUnreviewed: parsed.values["apply-unreviewed"] ?? false,
       autoProfile: !(parsed.values["no-auto-profile"] ?? false),
       extensions: parsed.values.extension ?? [],
       file: parsed.positionals[0] as string,
@@ -449,8 +466,8 @@ async function createPlan(
   const planHash = sha256(canonicalJson(canonicalRecord));
   const envelope: JsonObject = {
     schemaVersion: "1",
-    view: options.apply === undefined ? "edit-preview" : "edit-apply",
-    status: options.apply === undefined ? "preview" : "verified",
+    view: writesBpmn(options) ? "edit-apply" : "edit-preview",
+    status: writesBpmn(options) ? "verified" : "preview",
     planHash,
     sourceSha256: before.source.sha256,
     requestSha256,
@@ -523,7 +540,7 @@ export async function executeEdit(
       );
     }
 
-    if (options.apply !== undefined) {
+    if (writesBpmn(options)) {
       plan.envelope.destination = options.output ?? options.file;
       plan.envelope.status = "written";
       plan.envelope.outputSha256 = sha256(plan.finalXml);
@@ -545,7 +562,7 @@ export async function executeEdit(
       );
     }
 
-    if (options.apply !== undefined) {
+    if (writesBpmn(options)) {
       try {
         if (options.output === undefined) {
           await replaceSourceFile(options.file, plan.finalXml);

@@ -128,6 +128,14 @@ bpmn-cli edit "model.bpmn" --request "edit.json" \
   --apply "<planHash>" --output "edited.bpmn" --json
 ```
 
+For a trusted, non-review workflow, `--apply-unreviewed` performs the same request
+validation, structural checks, layout, reload verification, and atomic
+publication in one invocation. It writes in place unless `--output` is given:
+
+```sh
+bpmn-cli edit "model.bpmn" --request "edit.json" --apply-unreviewed --json
+```
+
 Edit supports `add`, `remove`, `replace`, and `move` over loaded BPMN, Zeebe,
 and custom moddle descriptors. Auto-layout is the default; `--no-layout`
 removes DI. Every operation requires explicit preconditions, and reciprocal

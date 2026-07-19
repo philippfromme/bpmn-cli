@@ -148,6 +148,7 @@ test("renders command help through both forms", async () => {
   assert.match(lint.output, /bpmnlint:correctness/);
   assert.match(diff.output, /--include-layout/);
   assert.match(edit.output, /--apply <plan-hash>/);
+  assert.match(edit.output, /--apply-unreviewed/);
   assert.match(layout.output, /semantic hashes/);
 
   for (const option of ["--help", "-h"]) {

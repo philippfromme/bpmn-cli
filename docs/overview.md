@@ -5,7 +5,7 @@ models. It is built for agents, but its rules are useful to humans too:
 
 - Ask for a small, exact piece of model information.
 - Treat BPMN business semantics and diagram presentation as different things.
-- Preview every edit before writing.
+- Preview edits before writing unless a trusted workflow explicitly uses unreviewed apply mode.
 - Apply only the exact preview that was reviewed.
 - Verify the output after it is written.
 
@@ -88,7 +88,7 @@ existing value, such as an element's `name`, a flow endpoint, or an extension
 property; it does not replace the entire BPMN element. Every operation states
 what it expects to find before changing it.
 
-Preview is mandatory. It does all validation in memory and never writes BPMN.
+Preview is the default. It does all validation in memory and never writes BPMN.
 The preview produces a `planHash`, which binds the source bytes, request bytes,
 profiles, options, resolved IDs, and planned result. Apply repeats the whole
 transaction and accepts only that exact hash.
@@ -153,6 +153,17 @@ bpmn-cli lint edited.bpmn --json
 If the model, request, selected profiles, or relevant options changed after
 preview, apply fails with `STALE_PLAN`. Create and review a new preview; do not
 guess or alter the hash.
+
+For a trusted, non-review workflow, `--apply-unreviewed` runs the same validation,
+serialization, layout, reload verification, and atomic publication in one
+invocation. It skips only external plan review and writes in place by default:
+
+```sh
+bpmn-cli edit model.bpmn --request rename.json --apply-unreviewed --json
+```
+
+Use it only when the request's preconditions fully express the expected source
+state; structural edits and unexpected derived effects are safer to preview.
 
 ## Why edits report effects
 

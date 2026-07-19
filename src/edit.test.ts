@@ -163,6 +163,54 @@ test("previews deterministically without writing and applies the exact plan", as
   });
 });
 
+test("applies an unreviewed verified edit in place without a plan hash", async () => {
+  await withFiles(async ({ source, request }) => {
+    const result = await executeEdit([
+      source,
+      "--request",
+      request,
+      "--no-layout",
+      "--apply-unreviewed",
+      "--json"
+    ]);
+    const envelope = JSON.parse(result.output) as {
+      destination: string;
+      outputSha256: string;
+      status: string;
+    };
+    const xml = await readFile(source, "utf8");
+    const parsed = await new BpmnModdle().fromXML(xml);
+    const process = parsed.rootElement.rootElements?.[0];
+
+    assert.equal(result.exitCode, 0, result.output);
+    assert.equal(envelope.status, "written");
+    assert.equal(envelope.destination, source);
+    assert.match(envelope.outputSha256, /^[a-f0-9]{64}$/);
+    assert.doesNotMatch(xml, /<bpmndi:/);
+    assert.ok(process?.flowElements?.some((element) => element.name === "Review"));
+  });
+});
+
+test("rejects combining unreviewed apply with plan approval", async () => {
+  await withFiles(async ({ source, request }) => {
+    const result = await executeEdit([
+      source,
+      "--request",
+      request,
+      "--apply",
+      "a".repeat(64),
+      "--apply-unreviewed",
+      "--json"
+    ]);
+
+    assert.equal(result.exitCode, 1);
+    assert.equal(
+      (JSON.parse(result.output) as { error: { code: string } }).error.code,
+      "INVALID_ARGUMENTS"
+    );
+  });
+});
+
 test("rejects a stale plan without publishing", async () => {
   await withFiles(async ({ source, request, output }) => {
     const result = await executeEdit([

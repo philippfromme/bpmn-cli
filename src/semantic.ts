@@ -319,13 +319,10 @@ function collaborationProjection(element: ModdleElement): JsonObject {
   }).value;
 }
 
-function scopeRecordProjection(element: ModdleElement): {
-  diagnostics: ProjectionDiagnostic[];
-  value: JsonObject;
-} {
+function scopeRecordProjection(element: ModdleElement): JsonObject {
   return projectElement(element, {
     omitProperties: SCOPE_RECORD_OMISSIONS
-  });
+  }).value;
 }
 
 function countByType(elements: readonly ModdleElement[]): JsonObject {
@@ -794,14 +791,11 @@ export function createScopeView(
   ];
   const selected = members.slice(options.offset, options.offset + options.limit);
   const projections = selected.map(({ element, kind }) => ({
-    ...scopeRecordProjection(element),
     element,
-    kind
+    kind,
+    value: scopeRecordProjection(element)
   }));
-  const diagnostics = projections.flatMap(({ diagnostics: itemDiagnostics }) =>
-    itemDiagnostics.map(normalizeProjectionDiagnostic)
-  );
-  const envelope = baseEnvelope(model, "scope", diagnostics);
+  const envelope = baseEnvelope(model, "scope");
   const nextOffset =
     options.offset + selected.length < members.length
       ? options.offset + selected.length
@@ -832,7 +826,7 @@ export function createScopeView(
 }
 
 function relatedProjection(element: ModdleElement): JsonObject {
-  return scopeRecordProjection(element).value;
+  return scopeRecordProjection(element);
 }
 
 function uniqueElements(elements: readonly ModdleElement[]): ModdleElement[] {
@@ -853,11 +847,7 @@ export function createElementView(
   const projection = projectElement(element, {
     omitProperties: all ? undefined : ELEMENT_OMISSIONS
   });
-  const envelope = baseEnvelope(
-    model,
-    "element",
-    projection.diagnostics.map(normalizeProjectionDiagnostic)
-  );
+  const envelope = baseEnvelope(model, "element");
   const process = processOf(element);
   const container = containerOf(element);
   const incomingValue = element.get("incoming");
@@ -906,11 +896,7 @@ export function createFullProcessProjection(
 
   const projection = projectElement(process);
   const descendants = descendantsOf(model, process);
-  const envelope = baseEnvelope(
-    model,
-    "process",
-    projection.diagnostics.map(normalizeProjectionDiagnostic)
-  );
+  const envelope = baseEnvelope(model, "process");
 
   envelope.process = projection.value;
   envelope.relatedRootElements = referencedRoots(model, descendants).map(

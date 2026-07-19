@@ -773,6 +773,12 @@ test("inspects generic extension elements without treating them as cursor errors
     "Process_Generic",
     "--json"
   ]);
+  const scopeResult = await inspect([
+    bpmn,
+    "--scope",
+    "Process_Generic",
+    "--json"
+  ]);
   const completeResult = await inspect([
     bpmn,
     "--process",
@@ -785,22 +791,24 @@ test("inspects generic extension elements without treating them as cursor errors
   const documents = [
     JSON.parse(elementResult.output),
     JSON.parse(processResult.output),
+    JSON.parse(scopeResult.output),
     JSON.parse(await readFile(output, "utf8"))
   ];
 
   assert.equal(elementResult.exitCode, 0);
   assert.equal(processResult.exitCode, 0);
+  assert.equal(scopeResult.exitCode, 0);
   assert.equal(completeResult.exitCode, 0);
 
   for (const document of documents) {
-    assert.ok(
-      document.analysis.diagnostics.some(
-        ({ code, message }: Record<string, string>) =>
-          code === "UNSUPPORTED_EXTENSION_DATA" &&
-          typeof message === "string" &&
-          message.includes("vendor:approvalPolicy")
-      )
+    const genericDiagnostics = document.analysis.diagnostics.filter(
+      ({ code, message }: Record<string, string>) =>
+        code === "UNSUPPORTED_EXTENSION_DATA" &&
+        typeof message === "string" &&
+        message.includes("vendor:approvalPolicy")
     );
+
+    assert.equal(genericDiagnostics.length, 1);
   }
 });
 

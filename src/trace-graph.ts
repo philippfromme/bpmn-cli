@@ -33,6 +33,7 @@ export interface TraceEnvelope extends JsonObject {
 
 type EdgeKind =
   | "boundary"
+  | "cancel"
   | "compensation"
   | "error"
   | "escalation"
@@ -81,6 +82,7 @@ const SCOPE_OMISSIONS = new Set([
 
 const EVENT_EDGE_KINDS = new Set<EdgeKind>([
   "boundary",
+  "cancel",
   "compensation",
   "error",
   "escalation",
@@ -231,21 +233,32 @@ function scopeEntryNodes(scope: ModdleElement): ModdleElement[] {
     : nodes.filter((element) => referenceArray(element, "incoming").length === 0);
 }
 
+function isAbnormalScopeTerminationEnd(element: ModdleElement): boolean {
+  return (
+    element.$type === "bpmn:EndEvent" &&
+    eventDefinitions(element).some(
+      ({ $type }) =>
+        $type === "bpmn:ErrorEventDefinition" ||
+        $type === "bpmn:CancelEventDefinition"
+    )
+  );
+}
+
 function scopeCompletionNodes(scope: ModdleElement): ModdleElement[] {
   const nodes = directFlowNodes(scope);
   const ends = nodes.filter(
     (element) =>
       element.$type === "bpmn:EndEvent" &&
-      !eventDefinitions(element).some(
-        ({ $type }) =>
-          $type === "bpmn:ErrorEventDefinition" ||
-          $type === "bpmn:CancelEventDefinition"
-      )
+      !isAbnormalScopeTerminationEnd(element)
   );
 
   return ends.length > 0
     ? ends
-    : nodes.filter((element) => referenceArray(element, "outgoing").length === 0);
+    : nodes.filter(
+        (element) =>
+          !isAbnormalScopeTerminationEnd(element) &&
+          referenceArray(element, "outgoing").length === 0
+      );
 }
 
 function eventDefinitions(element: ModdleElement): ModdleElement[] {
@@ -319,6 +332,46 @@ function catchHandlerDepth(
     containingScope === undefined ? -1 : scopes.indexOf(containingScope);
 
   return index >= 0 ? index : undefined;
+}
+
+function eventTransitionKind(
+  definition: ModdleElement
+):
+  | {
+      kind: "error" | "escalation";
+      referenceProperty: "errorRef" | "escalationRef";
+    }
+  | {
+      kind: "cancel";
+    }
+  | undefined {
+  if (definition.$type === "bpmn:ErrorEventDefinition") {
+    return { kind: "error", referenceProperty: "errorRef" };
+  }
+
+  if (definition.$type === "bpmn:EscalationEventDefinition") {
+    return { kind: "escalation", referenceProperty: "escalationRef" };
+  }
+
+  return definition.$type === "bpmn:CancelEventDefinition"
+    ? { kind: "cancel" }
+    : undefined;
+}
+
+function isCancelHandler(
+  throwingEvent: ModdleElement,
+  catchingEvent: ModdleElement
+): boolean {
+  if (catchingEvent.$type !== "bpmn:BoundaryEvent") {
+    return false;
+  }
+
+  const attached = catchingEvent.get("attachedToRef");
+  return (
+    isModdleElement(attached) &&
+    attached.$type === "bpmn:Transaction" &&
+    isAncestor(attached, throwingEvent)
+  );
 }
 
 function addEventDefinitionEdges(
@@ -418,33 +471,32 @@ function addEventDefinitionEdges(
       continue;
     }
 
-    const eventKind =
-      throwingDefinition.$type === "bpmn:ErrorEventDefinition"
-        ? "error"
-        : throwingDefinition.$type === "bpmn:EscalationEventDefinition"
-          ? "escalation"
-          : undefined;
-    const referenceProperty =
-      eventKind === "error"
-        ? "errorRef"
-        : eventKind === "escalation"
-          ? "escalationRef"
-          : undefined;
+    const transition = eventTransitionKind(throwingDefinition);
 
-    if (eventKind === undefined || referenceProperty === undefined) {
+    if (transition === undefined) {
       continue;
     }
 
     const matches = catchDefinitions
-      .filter(
-        (definition) =>
-          definition.$type === throwingDefinition.$type &&
-          matchingReference(
-            throwingDefinition,
-            definition,
-            referenceProperty
-          )
-      )
+      .filter((definition) => {
+        if (definition.$type !== throwingDefinition.$type) {
+          return false;
+        }
+
+        if (transition.kind === "cancel") {
+          const catchingEvent = eventOfDefinition(definition);
+          return (
+            catchingEvent !== undefined &&
+            isCancelHandler(throwingEvent, catchingEvent)
+          );
+        }
+
+        return matchingReference(
+          throwingDefinition,
+          definition,
+          transition.referenceProperty
+        );
+      })
       .map((definition) => ({
         depth: catchHandlerDepth(
           throwingEvent,
@@ -463,7 +515,7 @@ function addEventDefinitionEdges(
     for (const match of matches.filter(({ depth }) => depth === nearest)) {
       addEdge(graph, {
         from: throwingEvent,
-        kind: eventKind,
+        kind: transition.kind,
         to: match.event
       });
     }

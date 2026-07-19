@@ -52,6 +52,66 @@ function genericExtensionModel(): string {
 `;
 }
 
+function terminatedSubprocessModel(
+  kind: "cancel" | "error",
+  caught: boolean
+): string {
+  const isCancel = kind === "cancel";
+  const scopeElement = isCancel ? "bpmn:transaction" : "bpmn:subProcess";
+  const eventDefinition = isCancel
+    ? "<bpmn:cancelEventDefinition />"
+    : '<bpmn:errorEventDefinition errorRef="Error_Termination" />';
+  const errorDefinition = isCancel
+    ? ""
+    : '<bpmn:error id="Error_Termination" errorCode="termination" />';
+  const handler = caught
+    ? `
+    <bpmn:boundaryEvent id="Boundary_Termination" attachedToRef="Scope_Termination">
+      ${eventDefinition}
+      <bpmn:outgoing>Flow_Handler_End</bpmn:outgoing>
+    </bpmn:boundaryEvent>
+    <bpmn:task id="Handler_Termination">
+      <bpmn:incoming>Flow_Handler_End</bpmn:incoming>
+    </bpmn:task>
+    <bpmn:sequenceFlow id="Flow_Handler_End" sourceRef="Boundary_Termination" targetRef="Handler_Termination" />`
+    : "";
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  targetNamespace="https://example.test">
+  <bpmn:process id="Process_Termination">
+    <bpmn:startEvent id="Start_Parent">
+      <bpmn:outgoing>Flow_Parent_Scope</bpmn:outgoing>
+    </bpmn:startEvent>
+    <${scopeElement} id="Scope_Termination">
+      <bpmn:incoming>Flow_Parent_Scope</bpmn:incoming>
+      <bpmn:outgoing>Flow_Scope_Continue</bpmn:outgoing>
+      <bpmn:startEvent id="Start_Inner">
+        <bpmn:outgoing>Flow_Inner_Task</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:task id="Task_Inner">
+        <bpmn:incoming>Flow_Inner_Task</bpmn:incoming>
+        <bpmn:outgoing>Flow_Task_Termination</bpmn:outgoing>
+      </bpmn:task>
+      <bpmn:endEvent id="End_Termination">
+        <bpmn:incoming>Flow_Task_Termination</bpmn:incoming>
+        ${eventDefinition}
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_Inner_Task" sourceRef="Start_Inner" targetRef="Task_Inner" />
+      <bpmn:sequenceFlow id="Flow_Task_Termination" sourceRef="Task_Inner" targetRef="End_Termination" />
+    </${scopeElement}>
+    <bpmn:task id="Task_Continue">
+      <bpmn:incoming>Flow_Scope_Continue</bpmn:incoming>
+    </bpmn:task>
+    <bpmn:sequenceFlow id="Flow_Parent_Scope" sourceRef="Start_Parent" targetRef="Scope_Termination" />
+    <bpmn:sequenceFlow id="Flow_Scope_Continue" sourceRef="Scope_Termination" targetRef="Task_Continue" />
+    ${handler}
+  </bpmn:process>
+  ${errorDefinition}
+</bpmn:definitions>
+`;
+}
+
 function flowElements(document: {
   trace: {
     scopes: Array<{ flowElements: Array<Record<string, unknown>> }>;
@@ -717,6 +777,59 @@ test("selects nearest Error and Escalation handlers and compensation targets", a
         targetRef === "Activity_0oprw8j"
     )
   );
+});
+
+test("does not treat error or cancel termination as scope completion", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "bpmn-cli-termination-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+
+  for (const [kind, caught] of [
+    ["error", true],
+    ["error", false],
+    ["cancel", true],
+    ["cancel", false]
+  ] as const) {
+    const bpmn = join(directory, `${kind}-${caught ? "caught" : "uncaught"}.bpmn`);
+    await writeFile(bpmn, terminatedSubprocessModel(kind, caught));
+
+    const result = await trace([bpmn, "--from", "Task_Inner", "--json"]);
+    const document = JSON.parse(result.output);
+    const ids = new Set(
+      flowElements(document).map(({ id }: { id?: string }) => id)
+    );
+    const scopeTransitions = document.analysis.scopeTransitions ?? [];
+    const eventTransitions = document.analysis.eventTransitions ?? [];
+
+    assert.equal(result.exitCode, 0);
+    assert.ok(!ids.has("Task_Continue"));
+    assert.ok(
+      !scopeTransitions.some(
+        ({ kind: transitionKind, sourceRef, targetRef }: Record<string, string>) =>
+          transitionKind === "completion" &&
+          sourceRef === "End_Termination" &&
+          targetRef === "Scope_Termination"
+      )
+    );
+
+    if (caught) {
+      assert.ok(ids.has("Handler_Termination"));
+      assert.ok(
+        eventTransitions.some(
+          ({ kind: transitionKind, sourceRef, targetRef }: Record<string, string>) =>
+            transitionKind === kind &&
+            sourceRef === "End_Termination" &&
+            targetRef === "Boundary_Termination"
+        )
+      );
+    } else {
+      assert.ok(
+        !eventTransitions.some(
+          ({ sourceRef }: Record<string, string>) =>
+            sourceRef === "End_Termination"
+        )
+      );
+    }
+  }
 });
 
 test("reports SequenceFlow cycles separately from activity loops", async (context) => {

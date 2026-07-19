@@ -25,8 +25,9 @@ When choosing between approaches, prioritize in this order:
 6. Human usability.
 7. Implementation convenience.
 
-Document meaningful tradeoffs in `PLAN.md`. Do not expand mutation behavior
-until its contract and safety properties are approved there.
+Document meaningful tradeoffs with the relevant contract, tests, and user
+documentation. Do not expand mutation behavior until its contract and safety
+properties are approved.
 
 ## Agent-first CLI contract
 
@@ -117,5 +118,4 @@ until its contract and safety properties are approved there.
 - Do not implement an edit DSL by accident through command flags.
 - Do not expose a complete moddle serialization as `inspect`.
 - Do not add speculative commands without a concrete agent workflow.
-- Keep `PLAN.md`, CLI help, capabilities output, tests, and actual behavior in
-  sync.
+- Keep CLI help, capabilities output, tests, and actual behavior in sync.

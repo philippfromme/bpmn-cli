@@ -131,8 +131,8 @@ bpmn-cli edit "model.bpmn" --request "edit.json" \
 Edit supports `add`, `remove`, `replace`, and `move` over loaded BPMN, Zeebe,
 and custom moddle descriptors. Auto-layout is the default; `--no-layout`
 removes DI. Every operation requires explicit preconditions, and reciprocal
-BPMN references are normalized and reported as effects. See [PLAN.md](PLAN.md)
-for the complete safety contract.
+BPMN references are normalized and reported as effects. The
+[overview](docs/overview.md) describes the complete safety workflow.
 
 Run BPMN policy checks through the bundled `bpmnlint` engine:
 

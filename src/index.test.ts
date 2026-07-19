@@ -35,7 +35,6 @@ test("renders discoverable global help", async () => {
     assert.match(result.output, /layout/);
     assert.match(result.output, /help \[command\]/);
     assert.match(result.output, /bpmn-cli <command> --help/);
-    assert.match(result.output, /PLAN\.md/);
     assert.ok(result.output.endsWith("\n"));
   }
 });

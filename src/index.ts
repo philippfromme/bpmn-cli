@@ -118,7 +118,6 @@ Options:
   -h, --help       Display this help message
   -v, --version    Display the CLI version
 
-The Edit v1 safety contract is documented in PLAN.md.
 Run "bpmn-cli <command> --help" for command options.
 `;
 

@@ -18,6 +18,7 @@ import {
   validateEditRequest,
   type EditRequest
 } from "./edit-schema.js";
+import { editRecipeHelpText } from "./edit-recipe.js";
 import { engines } from "./engines.js";
 import {
   loadSemanticModelFromDocument,
@@ -120,6 +121,8 @@ Output:
 
 Preview never writes BPMN. --apply-unreviewed writes atomically after the same
 validation and verification. Auto-layout is the default.
+
+${editRecipeHelpText}
 `;
 
 function sha256(value: Buffer | string): string {

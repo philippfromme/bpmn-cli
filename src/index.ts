@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 
 import { executeDiff, diffLimits } from "./diff.js";
 import { editLimits, executeEdit } from "./edit.js";
+import { executeEditRecipe } from "./edit-recipe.js";
 import { engines } from "./engines.js";
 import { executeInspect, inspectLimits } from "./inspect.js";
 import { executeLayout } from "./layout.js";
@@ -74,6 +75,7 @@ export interface Capabilities {
     layout: "default-auto";
     limits: typeof editLimits;
     operations: readonly ["add", "remove", "replace", "move"];
+    recipes: readonly ["insert-activity"];
   };
   utilities: {
     diff: {
@@ -209,7 +211,8 @@ export function getCapabilities(): Capabilities {
       approval: "plan-hash",
       layout: "default-auto",
       limits: editLimits,
-      operations: ["add", "remove", "replace", "move"]
+      operations: ["add", "remove", "replace", "move"],
+      recipes: ["insert-activity"]
     },
     utilities: {
       diff: {
@@ -366,6 +369,9 @@ export async function execute(args: readonly string[]): Promise<CliResult> {
   }
 
   if (args[0] === "edit") {
+    if (args.includes("--recipe")) {
+      return executeEditRecipe(args.slice(1));
+    }
     return executeEdit(args.slice(1));
   }
 

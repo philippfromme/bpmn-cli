@@ -341,7 +341,10 @@ function resolveLocation(
       if (property.isReference) {
         throw new EditEngineError(
           "EDIT_PATH_INVALID",
-          `Cannot traverse reference property "${property.name}"; target the referenced ID`
+          `Cannot traverse reference property "${property.name}"; target the referenced ID. ` +
+            "Do not edit incoming/outgoing directly: update the relevant SequenceFlow " +
+            "sourceRef or targetRef and reciprocal references will be normalized. For an " +
+            "activity insertion, run \"bpmn-cli edit --help\" to see the insert-activity recipe."
         );
       }
 

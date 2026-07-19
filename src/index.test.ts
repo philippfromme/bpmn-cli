@@ -99,6 +99,7 @@ test("reports agent-discoverable capabilities", async () => {
     "replace",
     "move"
   ]);
+  assert.deepEqual(capabilities.editing.recipes, ["insert-activity"]);
   assert.match(capabilities.utilities.engines.differ.commit, /^[0-9a-f]{40}$/);
   assert.match(
     capabilities.utilities.engines.autoLayout.commit,
@@ -149,6 +150,11 @@ test("renders command help through both forms", async () => {
   assert.match(diff.output, /--include-layout/);
   assert.match(edit.output, /--apply <plan-hash>/);
   assert.match(edit.output, /--apply-unreviewed/);
+  assert.match(edit.output, /insert-activity/);
+  assert.match(
+    (await execute(["edit", "--recipe", "insert-activity", "--help"])).output,
+    /Recipes generate a schema-valid Edit v1 request/
+  );
   assert.match(layout.output, /semantic hashes/);
 
   for (const option of ["--help", "-h"]) {

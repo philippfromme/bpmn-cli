@@ -118,6 +118,20 @@ bpmn-cli edit --schema --json
 bpmn-cli edit "model.bpmn" --request "edit.json" --json
 ```
 
+For a common SequenceFlow insertion, generate the three-operation request
+instead of constructing it manually. The recipe reads the selected SequenceFlow
+to derive its containing scope and current target, but never writes BPMN:
+
+```sh
+bpmn-cli edit "model.bpmn" --recipe insert-activity \
+  --flow Flow_Approve --type bpmn:Task --name "Review application" \
+  --json > edit.json
+```
+
+Use `--type zeebe:userTask --form-id review-application` to create a native
+Camunda user task with its `zeebe:UserTask` marker and form definition. Create
+the matching Camunda Form before applying the request.
+
 Preview never writes BPMN. Apply reruns the complete transaction and requires
 the exact `planHash` returned by preview:
 

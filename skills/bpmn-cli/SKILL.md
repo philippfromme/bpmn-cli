@@ -58,6 +58,19 @@ Use `--follow-message-flows` only when cross-participant traversal is needed.
    bpmn-cli edit --schema --json
    ```
 
+   For a standard activity insertion on a SequenceFlow, prefer the built-in
+   request generator over writing operations manually:
+
+   ```sh
+   bpmn-cli edit model.bpmn --recipe insert-activity \
+     --flow Flow_Approve --type bpmn:Task --name "Review application" \
+     --json > edit.json
+   ```
+
+   Use `--type zeebe:userTask --form-id review-application` for a native
+   Camunda user task and create the matching form. Do not edit `incoming` or
+   `outgoing`; the edit engine normalizes them from SequenceFlow endpoints.
+
 4. Write a request with only `add`, `remove`, `replace`, or `move`. Every
    operation requires at least one `expect` assertion.
 5. Preview without writing BPMN:

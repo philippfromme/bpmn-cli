@@ -22,7 +22,7 @@ export interface ModelLoadOptions {
   autoProfile: boolean;
   extensions: readonly string[];
   file: string;
-  profileDetectionXml?: string;
+  profileDetectionDocuments?: readonly string[];
   profile?: "zeebe";
 }
 
@@ -83,9 +83,9 @@ export async function loadSemanticModelFromDocument(
   try {
     profiles = await resolveProfiles({
       autoProfile: options.autoProfile,
+      documents: options.profileDetectionDocuments ?? [document.xml],
       extensions: options.extensions,
-      profile: options.profile,
-      xml: options.profileDetectionXml ?? document.xml
+      profile: options.profile
     });
   } catch (error) {
     if (error instanceof ProfileError) {

@@ -209,6 +209,72 @@ test("detects exact extension-element property changes", async () => {
   }
 });
 
+test("diffs extensions introduced only by the after model", async () => {
+  const directory = await temporaryDirectory();
+  const before = join(directory, "before.bpmn");
+  const after = join(directory, "after.bpmn");
+  const plain = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" targetNamespace="https://example.com">
+  <bpmn:process id="Process_1">
+    <bpmn:serviceTask id="Task_1" name="Notify" />
+  </bpmn:process>
+</bpmn:definitions>
+`;
+  const withZeebe = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" targetNamespace="https://example.com">
+  <bpmn:process id="Process_1">
+    <bpmn:serviceTask id="Task_1" name="Notify">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-email" />
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+  </bpmn:process>
+</bpmn:definitions>
+`;
+
+  try {
+    await Promise.all([
+      writeFile(before, plain),
+      writeFile(after, withZeebe)
+    ]);
+
+    const forward = await execute(["diff", before, after, "--json"]);
+    const reversed = await execute(["diff", after, before, "--json"]);
+    const forwardDocument = JSON.parse(forward.output);
+    const reversedDocument = JSON.parse(reversed.output);
+    const forwardChanges = JSON.stringify(forwardDocument.changes);
+    const reversedChanges = JSON.stringify(reversedDocument.changes);
+
+    assert.equal(forward.exitCode, 0);
+    assert.equal(reversed.exitCode, 0);
+    assert.ok(forwardChanges.includes("zeebe:TaskDefinition"));
+    assert.ok(forwardChanges.includes("send-email"));
+    assert.ok(reversedChanges.includes("zeebe:TaskDefinition"));
+    assert.ok(reversedChanges.includes("send-email"));
+    assert.equal(
+      forwardDocument.before.semanticHash,
+      reversedDocument.after.semanticHash
+    );
+    assert.equal(
+      forwardDocument.after.semanticHash,
+      reversedDocument.before.semanticHash
+    );
+
+    for (const document of [forwardDocument, reversedDocument]) {
+      for (const side of [document.before, document.after]) {
+        assert.ok(
+          side.profiles.some(
+            (profile: { name: string; source: string }) =>
+              profile.name === "zeebe" && profile.source === "detected"
+          )
+        );
+      }
+    }
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
 test("keeps DI changes outside the semantic diff", async () => {
   const directory = await temporaryDirectory();
   const after = join(directory, "after.bpmn");

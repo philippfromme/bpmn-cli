@@ -402,12 +402,12 @@ async function loadModels(options: DiffOptions): Promise<{
     readSourceDocument(options.before),
     readSourceDocument(options.after)
   ]);
-  const profileDetectionXml = `${beforeDocument.xml}\n${afterDocument.xml}`;
+  const profileDetectionDocuments = [beforeDocument.xml, afterDocument.xml];
   const common = {
     autoProfile: options.autoProfile,
     extensions: options.extensions,
     profile: options.profile,
-    profileDetectionXml
+    profileDetectionDocuments
   };
   const [before, after] = await Promise.all([
     loadSemanticModelFromDocument(beforeDocument, common),

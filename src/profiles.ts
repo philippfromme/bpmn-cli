@@ -60,9 +60,9 @@ export interface ActiveProfile {
 
 export interface ResolveProfilesOptions {
   autoProfile: boolean;
+  documents: readonly string[];
   extensions: readonly string[];
   profile?: "zeebe";
-  xml: string;
 }
 
 export interface ResolvedProfiles {
@@ -258,7 +258,9 @@ export async function resolveProfiles(
 ): Promise<ResolvedProfiles> {
   const packages: Record<string, ModdlePackageDescriptor> = {};
   const active: ActiveProfile[] = [];
-  const declaresZeebe = declaresNamespace(options.xml, ZEEBE_NAMESPACE);
+  const declaresZeebe = options.documents.some((document) =>
+    declaresNamespace(document, ZEEBE_NAMESPACE)
+  );
   const zeebeSource =
     options.profile === "zeebe"
       ? "explicit"

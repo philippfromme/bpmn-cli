@@ -360,7 +360,7 @@ async function serializeAndVerify(
     autoProfile: boolean;
     extensions: string[];
     profile?: "zeebe";
-    profileDetectionXml: string;
+    profileDetectionDocuments: readonly string[];
   }
 ): Promise<{ model: SemanticModel; xml: string }> {
   setDiagrams(model.definitions, []);
@@ -424,7 +424,7 @@ async function createPlan(
     autoProfile: options.autoProfile,
     extensions: options.extensions,
     profile: options.profile,
-    profileDetectionXml: source.xml
+    profileDetectionDocuments: [source.xml]
   };
   const [before, editable] = await Promise.all([
     loadSemanticModelFromDocument(source, loaderOptions),

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  id="Definitions_Collaboration" targetNamespace="https://example.test">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_Customer" name="Customer" processRef="Process_Customer"/>
+    <bpmn:participant id="Participant_Support" name="Support" processRef="Process_Support"/>
+    <bpmn:messageFlow id="MessageFlow_Request" sourceRef="Task_SendRequest" targetRef="Task_ReceiveRequest"/>
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Customer" isExecutable="true">
+    <bpmn:startEvent id="Start_Customer"/>
+    <bpmn:sendTask id="Task_SendRequest" name="Request help"/>
+    <bpmn:endEvent id="End_Customer"/>
+    <bpmn:sequenceFlow id="Flow_Customer_Start" sourceRef="Start_Customer" targetRef="Task_SendRequest"/>
+    <bpmn:sequenceFlow id="Flow_Customer_End" sourceRef="Task_SendRequest" targetRef="End_Customer"/>
+  </bpmn:process>
+  <bpmn:process id="Process_Support" isExecutable="true">
+    <bpmn:startEvent id="Start_Support"/>
+    <bpmn:receiveTask id="Task_ReceiveRequest" name="Receive request"/>
+    <bpmn:subProcess id="SubProcess_Handle" name="Handle request">
+      <bpmn:startEvent id="Start_Handle"/>
+      <bpmn:userTask id="Task_Review" name="Review request"/>
+      <bpmn:endEvent id="End_Handle"/>
+      <bpmn:sequenceFlow id="Flow_Handle_Start" sourceRef="Start_Handle" targetRef="Task_Review"/>
+      <bpmn:sequenceFlow id="Flow_Handle_End" sourceRef="Task_Review" targetRef="End_Handle"/>
+    </bpmn:subProcess>
+    <bpmn:boundaryEvent id="Boundary_Timeout" attachedToRef="SubProcess_Handle" cancelActivity="false">
+      <bpmn:timerEventDefinition id="Timer_Timeout"/>
+    </bpmn:boundaryEvent>
+    <bpmn:exclusiveGateway id="Gateway_Resolved"/>
+    <bpmn:endEvent id="End_Resolved"/>
+    <bpmn:sequenceFlow id="Flow_Support_Start" sourceRef="Start_Support" targetRef="Task_ReceiveRequest"/>
+    <bpmn:sequenceFlow id="Flow_Support_Handle" sourceRef="Task_ReceiveRequest" targetRef="SubProcess_Handle"/>
+    <bpmn:sequenceFlow id="Flow_Support_Resolved" sourceRef="SubProcess_Handle" targetRef="Gateway_Resolved"/>
+    <bpmn:sequenceFlow id="Flow_Support_End" sourceRef="Gateway_Resolved" targetRef="End_Resolved"/>
+    <bpmn:sequenceFlow id="Flow_Support_Timeout" sourceRef="Boundary_Timeout" targetRef="End_Resolved"/>
+  </bpmn:process>
+</bpmn:definitions>

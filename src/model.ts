@@ -72,6 +72,10 @@ function isFlowElementContainer(element: ModdleElement): boolean {
   return element.$instanceOf("bpmn:FlowElementsContainer");
 }
 
+function isSequenceFlowEndpoint(element: ModdleElement): boolean {
+  return element.$instanceOf("bpmn:FlowNode");
+}
+
 function hasReference(element: ModdleElement, target: ModdleElement): boolean {
   return typedDescriptorProperties(element)
     .filter((property) => property.isReference)
@@ -390,7 +394,19 @@ export class BpmnModel {
     type: string,
     properties: Readonly<Record<string, CustomPropertyValue>> = {}
   ): CustomExtensionElement {
-    const raw = this.editable.moddle.create(type, { ...properties });
+    let raw: ModdleElement;
+
+    try {
+      raw = this.editable.moddle.create(type, { ...properties });
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("unknown type <")) {
+        throw new ModelApiError(
+          "INVALID_EXTENSION",
+          `${type} is not provided by a loaded moddle descriptor`
+        );
+      }
+      throw error;
+    }
 
     if (raw.$descriptor.isGeneric) {
       throw new ModelApiError(
@@ -436,8 +452,25 @@ export class BpmnModel {
       );
     }
 
+    if (
+      childRaw.$parent !== undefined &&
+      childRaw.$parent !== parentRaw
+    ) {
+      throw new ModelApiError(
+        "INVALID_CONTAINMENT",
+        `${childRaw.$type} already belongs to ${childRaw.$parent.$type}`
+      );
+    }
+
     if (descriptor.isMany) {
-      parentRaw.set(property, [...asElements(parentRaw.get(property)), childRaw]);
+      const children = asElements(parentRaw.get(property));
+      if (children.includes(childRaw)) {
+        throw new ModelApiError(
+          "INVALID_CONTAINMENT",
+          `${parentRaw.$type}.${property} already contains ${childRaw.$type}`
+        );
+      }
+      parentRaw.set(property, [...children, childRaw]);
     } else if (parentRaw.get(property) !== undefined) {
       throw new ModelApiError(
         "INVALID_CONTAINMENT",
@@ -465,7 +498,9 @@ export class BpmnModel {
     if (
       parent === undefined ||
       parent !== targetElement.raw.$parent ||
-      !isFlowElementContainer(parent)
+      !isFlowElementContainer(parent) ||
+      !isSequenceFlowEndpoint(sourceElement.raw) ||
+      !isSequenceFlowEndpoint(targetElement.raw)
     ) {
       throw new ModelApiError(
         "INVALID_CONNECTION",
@@ -522,7 +557,9 @@ export class BpmnModel {
       parent === undefined ||
       sequenceFlow.raw.$parent !== parent ||
       parent !== targetElement.$parent ||
-      !isFlowElementContainer(parent)
+      !isFlowElementContainer(parent) ||
+      !isSequenceFlowEndpoint(sourceElement) ||
+      !isSequenceFlowEndpoint(targetElement)
     ) {
       throw new ModelApiError(
         "INVALID_CONNECTION",

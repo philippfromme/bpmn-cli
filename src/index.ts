@@ -5,8 +5,6 @@ import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 
 import { executeDiff, diffLimits } from "./diff.js";
-import { editLimits, executeEdit } from "./edit.js";
-import { executeEditRecipe } from "./edit-recipe.js";
 import { engines } from "./engines.js";
 import { executeInspect, inspectLimits } from "./inspect.js";
 import { executeLayout } from "./layout.js";
@@ -70,13 +68,6 @@ export interface Capabilities {
     };
     modes: readonly ["forward", "backward", "connecting"];
   };
-  editing: {
-    approval: "plan-hash";
-    layout: "default-auto";
-    limits: typeof editLimits;
-    operations: readonly ["add", "remove", "replace", "move"];
-    recipes: readonly ["insert-activity"];
-  };
   utilities: {
     diff: {
       formats: readonly ["text", "json"];
@@ -109,7 +100,6 @@ Usage:
 Commands:
   capabilities      Show implemented and planned capabilities
   diff              Compare BPMN semantics
-  edit              Preview or apply descriptor-driven BPMN changes
   inspect           Inspect bounded BPMN business semantics
   layout            Replace BPMN DI with greenfield layout
   lint              Run configured bpmnlint rules
@@ -172,11 +162,6 @@ export function getCapabilities(): Capabilities {
         status: "available",
         outputFormats: ["text", "json"]
       },
-      {
-        name: "edit",
-        status: "available",
-        outputFormats: ["text", "json"]
-      }
     ],
     bpmn: {
       parsing: true,
@@ -206,13 +191,6 @@ export function getCapabilities(): Capabilities {
         outputFiles: "full"
       },
       modes: ["forward", "backward", "connecting"]
-    },
-    editing: {
-      approval: "plan-hash",
-      layout: "default-auto",
-      limits: editLimits,
-      operations: ["add", "remove", "replace", "move"],
-      recipes: ["insert-activity"]
     },
     utilities: {
       diff: {
@@ -248,7 +226,7 @@ Commands:
 ${commands}
 
 BPMN parsing: available
-BPMN mutation: available (preview and plan-hash apply)
+BPMN mutation: available through the TypeScript model API
 Inspect views: model, process, scope, element
 Inspect formats: text, json, jsonl
 Trace modes: forward, backward, connecting
@@ -320,10 +298,6 @@ async function executeHelp(args: readonly string[]): Promise<CliResult> {
     return executeDiff(["--help"]);
   }
 
-  if (args.length === 1 && args[0] === "edit") {
-    return executeEdit(["--help"]);
-  }
-
   if (args.length === 1 && args[0] === "layout") {
     return executeLayout(["--help"]);
   }
@@ -366,13 +340,6 @@ export async function execute(args: readonly string[]): Promise<CliResult> {
 
   if (args[0] === "diff") {
     return executeDiff(args.slice(1));
-  }
-
-  if (args[0] === "edit") {
-    if (args.includes("--recipe")) {
-      return executeEditRecipe(args.slice(1));
-    }
-    return executeEdit(args.slice(1));
   }
 
   if (args[0] === "layout") {

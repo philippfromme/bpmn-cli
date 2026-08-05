@@ -1,6 +1,7 @@
 # Inspect and diagnose
 
-Use this workflow before proposing an edit or responding to a lint finding.
+Use this workflow when a BPMN change needs semantic context or when responding
+to a lint finding.
 
 ```sh
 bpmn-cli inspect model.bpmn --json > catalog.json

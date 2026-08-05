@@ -1,7 +1,7 @@
 {
   "name": "@philippfromme/bpmn-cli",
   "version": "0.1.0",
-  "description": "Agent-first inspection, tracing, safe editing, linting, semantic diffing, and layout for BPMN.",
+  "description": "Agent-first BPMN inspection, fluent model API, linting, semantic diffing, and layout.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/philippfromme/bpmn-cli.git"

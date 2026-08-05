@@ -93,13 +93,6 @@ test("reports agent-discoverable capabilities", async () => {
   assert.equal(capabilities.utilities.diff.includeLayout, "opt-in");
   assert.equal(capabilities.utilities.layout.writes, "in-place-or-output");
   assert.equal(capabilities.bpmn.mutation, true);
-  assert.deepEqual(capabilities.editing.operations, [
-    "add",
-    "remove",
-    "replace",
-    "move"
-  ]);
-  assert.deepEqual(capabilities.editing.recipes, ["insert-activity"]);
   assert.match(capabilities.utilities.engines.differ.commit, /^[0-9a-f]{40}$/);
   assert.match(
     capabilities.utilities.engines.autoLayout.commit,
@@ -136,7 +129,6 @@ test("renders command help through both forms", async () => {
   const trace = await execute(["help", "trace"]);
   const lint = await execute(["help", "lint"]);
   const diff = await execute(["help", "diff"]);
-  const edit = await execute(["help", "edit"]);
   const layout = await execute(["help", "layout"]);
 
   assert.match(capabilities.output, /bpmn-cli capabilities \[--json\]/);
@@ -148,13 +140,6 @@ test("renders command help through both forms", async () => {
   assert.match(trace.output, /32 KiB/);
   assert.match(lint.output, /bpmnlint:correctness/);
   assert.match(diff.output, /--include-layout/);
-  assert.match(edit.output, /--apply <plan-hash>/);
-  assert.match(edit.output, /--apply-unreviewed/);
-  assert.match(edit.output, /insert-activity/);
-  assert.match(
-    (await execute(["edit", "--recipe", "insert-activity", "--help"])).output,
-    /Recipes generate a schema-valid Edit v1 request/
-  );
   assert.match(layout.output, /semantic hashes/);
 
   for (const option of ["--help", "-h"]) {

@@ -36,6 +36,7 @@ export interface ModdleTypeMap {
     readonly "completionCondition"?: ModdleElement;
     readonly "ordering"?: ModdleElement;
     readonly "cancelRemainingInstances"?: boolean;
+    readonly "retryCounter"?: string;
   };
   "bpmn:Assignment": {
     readonly "id"?: string;
@@ -110,6 +111,7 @@ export interface ModdleTypeMap {
     readonly "incomingConversationLinks"?: readonly ModdleElement[];
     readonly "outgoingConversationLinks"?: readonly ModdleElement[];
     readonly "implementation"?: string;
+    readonly "retryCounter"?: string;
   };
   "bpmn:CallActivity": {
     readonly "id"?: string;
@@ -248,6 +250,9 @@ export interface ModdleTypeMap {
     readonly "correlationKeys"?: readonly ModdleElement[];
     readonly "choreographyRef"?: readonly ModdleElement[];
     readonly "conversationLinks"?: readonly ModdleElement[];
+    readonly "modelerTemplate"?: string;
+    readonly "modelerTemplateVersion"?: number;
+    readonly "modelerTemplateIcon"?: string;
   };
   "bpmn:CompensateEventDefinition": {
     readonly "id"?: string;
@@ -516,6 +521,7 @@ export interface ModdleTypeMap {
     readonly "inputSet"?: ModdleElement;
     readonly "eventDefinitions"?: readonly ModdleElement[];
     readonly "eventDefinitionRef"?: readonly ModdleElement[];
+    readonly "retryCounter"?: string;
   };
   "bpmn:EndPoint": {
     readonly "id"?: string;
@@ -531,6 +537,7 @@ export interface ModdleTypeMap {
     readonly "structureRef"?: ModdleElement;
     readonly "name"?: string;
     readonly "errorCode"?: string;
+    readonly "modelerTemplate"?: string;
   };
   "bpmn:ErrorEventDefinition": {
     readonly "id"?: string;
@@ -547,6 +554,7 @@ export interface ModdleTypeMap {
     readonly "structureRef"?: ModdleElement;
     readonly "name"?: string;
     readonly "escalationCode"?: string;
+    readonly "modelerTemplate"?: string;
   };
   "bpmn:EscalationEventDefinition": {
     readonly "id"?: string;
@@ -855,6 +863,7 @@ export interface ModdleTypeMap {
     readonly "inputSet"?: ModdleElement;
     readonly "eventDefinitions"?: readonly ModdleElement[];
     readonly "eventDefinitionRef"?: readonly ModdleElement[];
+    readonly "retryCounter"?: string;
   };
   "bpmn:ItemAwareElement": {
     readonly "id"?: string;
@@ -935,6 +944,7 @@ export interface ModdleTypeMap {
     readonly "extensionElements"?: ModdleElement;
     readonly "name"?: string;
     readonly "itemRef"?: ModdleElement;
+    readonly "modelerTemplate"?: string;
   };
   "bpmn:MessageEventDefinition": {
     readonly "id"?: string;
@@ -1108,6 +1118,9 @@ export interface ModdleTypeMap {
     readonly "supports"?: readonly ModdleElement[];
     readonly "definitionalCollaborationRef"?: ModdleElement;
     readonly "isExecutable"?: boolean;
+    readonly "modelerTemplate"?: string;
+    readonly "modelerTemplateVersion"?: number;
+    readonly "modelerTemplateIcon"?: string;
   };
   "bpmn:Property": {
     readonly "id"?: string;
@@ -1233,6 +1246,7 @@ export interface ModdleTypeMap {
     readonly "outgoingConversationLinks"?: readonly ModdleElement[];
     readonly "scriptFormat"?: string;
     readonly "script"?: string;
+    readonly "retryCounter"?: string;
   };
   "bpmn:SendTask": {
     readonly "id"?: string;
@@ -1262,6 +1276,7 @@ export interface ModdleTypeMap {
     readonly "implementation"?: string;
     readonly "operationRef"?: ModdleElement;
     readonly "messageRef"?: ModdleElement;
+    readonly "retryCounter"?: string;
   };
   "bpmn:SequenceFlow": {
     readonly "id"?: string;
@@ -1304,6 +1319,7 @@ export interface ModdleTypeMap {
     readonly "outgoingConversationLinks"?: readonly ModdleElement[];
     readonly "implementation"?: string;
     readonly "operationRef"?: ModdleElement;
+    readonly "retryCounter"?: string;
   };
   "bpmn:Signal": {
     readonly "id"?: string;
@@ -1312,6 +1328,7 @@ export interface ModdleTypeMap {
     readonly "extensionElements"?: ModdleElement;
     readonly "structureRef"?: ModdleElement;
     readonly "name"?: string;
+    readonly "modelerTemplate"?: string;
   };
   "bpmn:SignalEventDefinition": {
     readonly "id"?: string;
@@ -1635,12 +1652,16 @@ export interface ModdleTypeMap {
   "zeebe:CalledDecision": {
     readonly "decisionId"?: string;
     readonly "resultVariable"?: string;
+    readonly "bindingType"?: string;
+    readonly "versionTag"?: string;
   };
   "zeebe:CalledElement": {
     readonly "processId"?: string;
     readonly "processIdExpression"?: string;
     readonly "propagateAllChildVariables"?: boolean;
     readonly "propagateAllParentVariables"?: boolean;
+    readonly "bindingType"?: string;
+    readonly "versionTag"?: string;
   };
   "zeebe:ConditionalFilter": {
     readonly "variableNames"?: string;
@@ -1659,6 +1680,8 @@ export interface ModdleTypeMap {
     readonly "formKey"?: string;
     readonly "formId"?: string;
     readonly "externalReference"?: string;
+    readonly "bindingType"?: string;
+    readonly "versionTag"?: string;
   };
   "zeebe:Header": {
     readonly "id"?: string;
@@ -1668,6 +1691,8 @@ export interface ModdleTypeMap {
   "zeebe:Input": {
     readonly "source"?: string;
     readonly "target"?: string;
+    readonly "modelerConfigurationTemplate"?: string;
+    readonly "modelerConfigurationName"?: string;
   };
   "zeebe:InputOutputParameter": {
     readonly "source"?: string;
@@ -1685,6 +1710,8 @@ export interface ModdleTypeMap {
     readonly "resourceId"?: string;
     readonly "resourceType"?: string;
     readonly "linkName"?: string;
+    readonly "bindingType"?: string;
+    readonly "versionTag"?: string;
   };
   "zeebe:LinkedResources": {
     readonly "values"?: readonly ModdleElement[];
@@ -1708,6 +1735,8 @@ export interface ModdleTypeMap {
   "zeebe:Property": {
     readonly "name"?: string;
     readonly "value"?: string;
+    readonly "modelerConfigurationTemplate"?: string;
+    readonly "modelerConfigurationName"?: string;
   };
   "zeebe:Script": {
     readonly "expression"?: string;
@@ -1742,9 +1771,6 @@ export interface ModdleTypeMap {
   };
   "zeebe:VersionTag": {
     readonly "value"?: string;
-  };
-  "zeebe:ZeebeServiceTask": {
-    readonly "retryCounter"?: string;
   };
 }
 
@@ -1915,5 +1941,4 @@ export const supportedElementTypes = [
   "zeebe:UserTask",
   "zeebe:UserTaskForm",
   "zeebe:VersionTag",
-  "zeebe:ZeebeServiceTask",
 ] as const satisfies readonly SupportedElementType[];

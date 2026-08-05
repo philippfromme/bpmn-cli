@@ -52,6 +52,7 @@ export class ModelApiError extends Error {
       | "INVALID_EXTENSION"
       | "INVALID_FORM"
       | "ELEMENT_REFERENCED"
+      | "FOREIGN_ELEMENT"
       | "OUTPUT_REQUIRED",
     message: string
   ) {
@@ -239,6 +240,10 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
     return this.raw.$type;
   }
 
+  isOwnedBy(model: BpmnModel): boolean {
+    return this.model === model;
+  }
+
   get name(): string | undefined {
     return this.raw.name;
   }
@@ -269,6 +274,7 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
 export class BpmnModel {
   private readonly ids = new Set<string>();
   private readonly elementsById = new Map<string, ModdleElement>();
+  private readonly ownedElements = new Set<ModdleElement>();
 
   private constructor(
     private readonly baseline: SemanticModel,
@@ -375,6 +381,7 @@ export class BpmnModel {
       raw.id = requestedId ?? this.allocateId(type);
       this.ids.add(raw.id);
     }
+    this.ownedElements.add(raw);
 
     return this.wrap(raw);
   }
@@ -401,6 +408,7 @@ export class BpmnModel {
       }
     }
 
+    this.ownedElements.add(raw);
     return new CustomExtensionElement(this, raw);
   }
 
@@ -415,8 +423,8 @@ export class BpmnModel {
     child: ModdleElement | ModelElement,
     property: string
   ): void {
-    const parentRaw = parent instanceof ModelElement ? parent.raw : parent;
-    const childRaw = child instanceof ModelElement ? child.raw : child;
+    const parentRaw = this.ownedRaw(parent);
+    const childRaw = this.ownedRaw(child);
     const descriptor = typedDescriptorProperties(parentRaw).find(
       (candidate) => candidate.name === property
     );
@@ -450,6 +458,8 @@ export class BpmnModel {
   ): ModelElement<"bpmn:SequenceFlow"> {
     const sourceElement = typeof source === "string" ? this.element(source) : source;
     const targetElement = typeof target === "string" ? this.element(target) : target;
+    this.assertOwnedWrapper(sourceElement);
+    this.assertOwnedWrapper(targetElement);
     const parent = sourceElement.raw.$parent;
 
     if (
@@ -480,6 +490,13 @@ export class BpmnModel {
     }
   ): ModelElement<"bpmn:SequenceFlow"> {
     const sequenceFlow = typeof flow === "string" ? this.element<"bpmn:SequenceFlow">(flow) : flow;
+    this.assertOwnedWrapper(sequenceFlow);
+    if (endpoints.source instanceof ModelElement) {
+      this.assertOwnedWrapper(endpoints.source);
+    }
+    if (endpoints.target instanceof ModelElement) {
+      this.assertOwnedWrapper(endpoints.target);
+    }
     const source = endpoints.source === undefined
       ? sequenceFlow.raw.get("sourceRef")
       : typeof endpoints.source === "string"
@@ -530,6 +547,7 @@ export class BpmnModel {
 
   remove(element: string | ModelElement): void {
     const selected = typeof element === "string" ? this.element(element) : element;
+    this.assertOwnedWrapper(selected);
 
     if (selected.raw.$instanceOf("bpmn:SequenceFlow")) {
       const source = selected.raw.get("sourceRef");
@@ -646,13 +664,38 @@ export class BpmnModel {
 
   private refreshIndexes(): void {
     this.elementsById.clear();
-    this.ids.clear();
 
     for (const element of collectSemanticElements(this.editable.definitions)) {
+      this.ownedElements.add(element);
       if (element.id !== undefined) {
         this.elementsById.set(element.id, element);
         this.ids.add(element.id);
       }
     }
+  }
+
+  private assertOwnedWrapper(element: ModelElement): void {
+    if (!element.isOwnedBy(this)) {
+      throw new ModelApiError(
+        "FOREIGN_ELEMENT",
+        "BPMN elements must belong to the model receiving the operation"
+      );
+    }
+  }
+
+  private ownedRaw(element: ModdleElement | ModelElement): ModdleElement {
+    if (element instanceof ModelElement) {
+      this.assertOwnedWrapper(element);
+      return element.raw;
+    }
+
+    if (!this.ownedElements.has(element)) {
+      throw new ModelApiError(
+        "FOREIGN_ELEMENT",
+        "BPMN elements must belong to the model receiving the operation"
+      );
+    }
+
+    return element;
   }
 }

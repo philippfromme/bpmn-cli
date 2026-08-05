@@ -63,9 +63,35 @@ function inheritedProperties(entry, visited = new Set()) {
   return [...new Map(properties.map((property) => [property.name, property])).values()];
 }
 
+function extendedProperties(entry) {
+  const typeName = `${entry.prefix}:${entry.type.name}`;
+  const traits = allTypeEntries.filter((candidate) =>
+    (candidate.type.extends ?? []).some((extendedType) => {
+      const name = extendedType.includes(":")
+        ? extendedType
+        : `${candidate.prefix}:${extendedType}`;
+      return name === typeName;
+    })
+  );
+
+  return traits.flatMap((trait) => inheritedProperties(trait));
+}
+
 const typeEntries = allTypeEntries
-  .filter(({ type }) => !type.isAbstract)
-  .map((entry) => ({ ...entry, properties: inheritedProperties(entry) }))
+  .filter(
+    ({ type }) =>
+      !type.isAbstract &&
+      (!Array.isArray(type.extends) || type.extends.length === 0)
+  )
+  .map((entry) => ({
+    ...entry,
+    properties: [
+      ...new Map(
+        [...inheritedProperties(entry), ...extendedProperties(entry)]
+          .map((property) => [property.name, property])
+      ).values()
+    ]
+  }))
   .sort(({ prefix: leftPrefix, type: left }, { prefix: rightPrefix, type: right }) =>
     `${leftPrefix}:${left.name}`.localeCompare(`${rightPrefix}:${right.name}`)
   );

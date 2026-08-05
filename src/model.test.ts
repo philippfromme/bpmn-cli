@@ -9,6 +9,10 @@ import { BpmnModel, ModelApiError } from "./index.js";
 import { ModelLoadError } from "./model-loader.js";
 import { ModelPublicationError } from "./model-runtime.js";
 import { loadSemanticModel } from "./model-loader.js";
+import {
+  isSupportedElementType,
+  type ElementProperties
+} from "./model-types.js";
 
 const zeebeFixture = fileURLToPath(
   new URL("../test/fixtures/AI Email Support Agent.bpmn", import.meta.url)
@@ -123,6 +127,51 @@ test("maintains sequence-flow reciprocal references while rewiring and removing"
   model.remove(flow);
   assert.deepEqual(first.raw.outgoing, []);
   assert.deepEqual(replacement.raw.incoming, []);
+});
+
+test("reserves generated IDs for unattached elements", async () => {
+  const model = await BpmnModel.create();
+  const deferred = model.create("bpmn:Task", {});
+
+  model.process();
+  const later = model.create("bpmn:Task", {});
+
+  assert.equal(deferred.id, "Task_1");
+  assert.equal(later.id, "Task_2");
+});
+
+test("rejects wrappers from another model without mutating either graph", async () => {
+  const firstModel = await BpmnModel.create();
+  const firstProcess = firstModel.process();
+  const firstTask = firstModel.create("bpmn:Task", {});
+  firstModel.append(firstProcess, firstTask, "flowElements");
+  const secondModel = await BpmnModel.create();
+  const secondTask = secondModel.create("bpmn:Task", {});
+
+  const expectsForeignElement = (operation: () => void): void => {
+    assert.throws(
+      operation,
+      (error: unknown) =>
+        error instanceof ModelApiError && error.code === "FOREIGN_ELEMENT"
+    );
+  };
+
+  expectsForeignElement(() =>
+    firstModel.append(firstProcess, secondTask, "flowElements")
+  );
+  expectsForeignElement(() => firstModel.connect(firstTask, secondTask));
+  expectsForeignElement(() => firstModel.remove(secondTask));
+  assert.deepEqual(firstProcess.raw.flowElements, [firstTask.raw]);
+  assert.equal(secondTask.raw.$parent, undefined);
+});
+
+test("excludes descriptor traits from constructible types while merging trait fields", () => {
+  const serviceTask: ElementProperties<"bpmn:ServiceTask"> = {
+    retryCounter: "3"
+  };
+
+  assert.equal(serviceTask.retryCounter, "3");
+  assert.equal(isSupportedElementType("zeebe:ZeebeServiceTask"), false);
 });
 
 test("rejects ambiguous lookup and in-use element removal", async () => {

@@ -5,7 +5,10 @@ import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 
 import { engines } from "./engines.js";
+import { executeApi } from "./api.js";
+import { diffHelpText } from "./diff-help.js";
 import { executeInspect, inspectLimits } from "./inspect.js";
+import { layoutHelpText } from "./layout-help.js";
 import { executeLint, lintLimits } from "./lint.js";
 import { executeTrace, traceLimits } from "./trace.js";
 
@@ -122,6 +125,7 @@ Usage:
 
 Commands:
   capabilities      Show implemented and planned capabilities
+  api               Discover bounded fluent model API topics
   diff              Compare BPMN semantics
   inspect           Inspect bounded BPMN business semantics
   layout            Replace BPMN DI with greenfield layout
@@ -158,6 +162,11 @@ export function getCapabilities(): Capabilities {
     commands: [
       {
         name: "capabilities",
+        status: "available",
+        outputFormats: ["text", "json"]
+      },
+      {
+        name: "api",
         status: "available",
         outputFormats: ["text", "json"]
       },
@@ -311,6 +320,10 @@ async function executeHelp(args: readonly string[]): Promise<CliResult> {
     return executeCapabilities(["--help"]);
   }
 
+  if (args.length === 1 && args[0] === "api") {
+    return executeApi(["--help"]);
+  }
+
   if (args.length === 1 && args[0] === "inspect") {
     return executeInspect(["--help"]);
   }
@@ -324,13 +337,11 @@ async function executeHelp(args: readonly string[]): Promise<CliResult> {
   }
 
   if (args.length === 1 && args[0] === "diff") {
-    const { executeDiff } = await import("./diff.js");
-    return executeDiff(["--help"]);
+    return { exitCode: 0, output: diffHelpText, stream: "stdout" };
   }
 
   if (args.length === 1 && args[0] === "layout") {
-    const { executeLayout } = await import("./layout.js");
-    return executeLayout(["--help"]);
+    return { exitCode: 0, output: layoutHelpText, stream: "stdout" };
   }
 
   if (args.length === 1 && args[0] === "model") {
@@ -356,6 +367,10 @@ export async function execute(args: readonly string[]): Promise<CliResult> {
 
   if (args[0] === "capabilities") {
     return executeCapabilities(args.slice(1));
+  }
+
+  if (args[0] === "api") {
+    return executeApi(args.slice(1));
   }
 
   if (args[0] === "help") {

@@ -49,6 +49,25 @@ bpmn-cli layout model.bpmn --output laid-out.bpmn --json
 `inspect` and `trace` are optional diagnostics, not mutation preconditions.
 `lint` reports BPMN policy issues and does not replace structural/reload safety.
 
+## API discovery and programs
+
+Discover only the methods and focused snippets relevant to a task:
+
+```sh
+bpmn-cli api io-mapping --json
+bpmn-cli api connections --json
+```
+
+Programs are explicit trusted local ESM files with an async default export. They
+run in a separate Node.js process, receive `{ BpmnModel }`, and use the same
+publication pipeline as direct library callers:
+
+```sh
+bpmn-cli model examples/create-customer-email.mjs --json
+```
+
+This is an execution boundary, not a sandbox: run only programs you trust.
+
 ## Profiles
 
 The Zeebe profile activates automatically when its standard namespace is

@@ -39,7 +39,8 @@ export class ModelPublicationError extends Error {
       | "LAYOUT_FAILED"
       | "LAYOUT_UNSUPPORTED"
       | "MODEL_VERIFICATION_FAILED"
-      | "OUTPUT_WRITE_FAILED",
+      | "OUTPUT_WRITE_FAILED"
+      | "UNSUPPORTED_EXTENSION_DATA",
     message: string
   ) {
     super(message);
@@ -109,6 +110,19 @@ function assertNoIntroducedParseDiagnostics(
   }
 }
 
+function assertSupportedExtensionData(model: SemanticModel): void {
+  const unsupported = model.diagnostics.find(
+    (diagnostic) => diagnostic.code === "UNSUPPORTED_EXTENSION_DATA"
+  );
+
+  if (unsupported !== undefined) {
+    throw new ModelPublicationError(
+      "UNSUPPORTED_EXTENSION_DATA",
+      `${unsupported.message}; load its moddle descriptor before publishing`
+    );
+  }
+}
+
 function publicationChanges(
   before: SemanticModel,
   after: SemanticModel
@@ -159,6 +173,8 @@ export async function serializeAndVerifyModel(
   options: PublishOptions = {}
 ): Promise<{ model: SemanticModel; xml: string }> {
   const layout = options.layout ?? "auto";
+  assertSupportedExtensionData(before);
+  assertSupportedExtensionData(editable);
   const expectedSemanticHash = semanticHash(editable.definitions);
   setDiagrams(editable.definitions, []);
   let xml = (await editable.moddle.toXML(editable.definitions, { format: true })).xml;

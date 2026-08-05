@@ -28,6 +28,7 @@ test("renders discoverable global help", async () => {
     assert.equal(result.stream, "stdout");
     assert.match(result.output, /^bpmn-cli /);
     assert.match(result.output, /capabilities/);
+    assert.match(result.output, /api/);
     assert.match(result.output, /inspect/);
     assert.match(result.output, /trace/);
     assert.match(result.output, /lint/);
@@ -110,6 +111,12 @@ test("reports agent-discoverable capabilities", async () => {
   );
   assert.deepEqual(
     capabilities.commands.find(
+      (command: { name: string }) => command.name === "api"
+    )?.outputFormats,
+    ["text", "json"]
+  );
+  assert.deepEqual(
+    capabilities.commands.find(
       (command: { name: string }) => command.name === "capabilities"
     )?.outputFormats,
     ["text", "json"]
@@ -121,6 +128,22 @@ test("reports agent-discoverable capabilities", async () => {
     ["text", "json", "mermaid"]
   );
   assert.match((await execute(["capabilities"])).output, /Inspect views:/);
+});
+
+test("discovers bounded fluent API topics", async () => {
+  const result = await execute(["api", "io-mapping", "--json"]);
+  const envelope = JSON.parse(result.output);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(envelope.view, "api");
+  assert.deepEqual(envelope.topics[0].methods, [
+    "BpmnModel.open",
+    "model.element",
+    "element.extensions.ensure",
+    "ioMapping.addInput",
+    "model.publish"
+  ]);
+  assert.equal((await execute(["api", "unknown", "--json"])).exitCode, 1);
 });
 
 test("renders command help through both forms", async () => {

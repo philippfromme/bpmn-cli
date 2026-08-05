@@ -28,6 +28,9 @@ await model.publish({
 For usage details, see the [overview](docs/overview.md) and concise
 [agent skill](skills/bpmn-cli/SKILL.md).
 
+Discover focused model operations with `bpmn-cli api <topic> --json`, or run an
+explicit trusted ESM program through `bpmn-cli model examples/create-customer-email.mjs --json`.
+
 ## Development
 
 ```sh

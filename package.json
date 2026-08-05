@@ -25,7 +25,9 @@
     "schema"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run check:types && tsc -p tsconfig.json",
+    "check:types": "node scripts/generate-model-types.mjs --check",
+    "generate:types": "node scripts/generate-model-types.mjs",
     "prepare": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",

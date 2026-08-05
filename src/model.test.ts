@@ -6,6 +6,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { BpmnModel, ModelApiError } from "./model.js";
+import { ModelLoadError } from "./model-loader.js";
 import { ModelPublicationError } from "./model-runtime.js";
 import { loadSemanticModel } from "./model-loader.js";
 
@@ -201,6 +202,27 @@ test("refuses publication when extension data has no loaded descriptor", async (
       (error: unknown) =>
         error instanceof ModelPublicationError &&
         error.code === "UNSUPPORTED_EXTENSION_DATA"
+    );
+  });
+});
+
+test("rejects malformed extension XML while opening a model", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const source = join(directory, "malformed.bpmn");
+    await writeFile(
+      source,
+      `<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL">
+  <bpmn:process id="Process_1"><bpmn:task id="Task_1">
+    <bpmn:extensionElements><acme:settings>
+  </bpmn:task></bpmn:process>
+</bpmn:definitions>`,
+      "utf8"
+    );
+
+    await assert.rejects(
+      BpmnModel.open(source),
+      (error: unknown) =>
+        error instanceof ModelLoadError && error.code === "BPMN_PARSE_FAILED"
     );
   });
 });

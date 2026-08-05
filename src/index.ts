@@ -126,6 +126,7 @@ Commands:
   inspect           Inspect bounded BPMN business semantics
   layout            Replace BPMN DI with greenfield layout
   lint              Run configured bpmnlint rules
+  model             Run a trusted fluent model program
   trace             Trace bounded BPMN business behavior
   help [command]    Show global or command-specific help
 
@@ -182,6 +183,11 @@ export function getCapabilities(): Capabilities {
       },
       {
         name: "layout",
+        status: "available",
+        outputFormats: ["text", "json"]
+      },
+      {
+        name: "model",
         status: "available",
         outputFormats: ["text", "json"]
       },
@@ -327,6 +333,11 @@ async function executeHelp(args: readonly string[]): Promise<CliResult> {
     return executeLayout(["--help"]);
   }
 
+  if (args.length === 1 && args[0] === "model") {
+    const { executeModelProgram } = await import("./model-program.js");
+    return executeModelProgram(["--help"]);
+  }
+
   return invalidArguments(["help", ...args]);
 }
 
@@ -371,6 +382,11 @@ export async function execute(args: readonly string[]): Promise<CliResult> {
   if (args[0] === "layout") {
     const { executeLayout } = await import("./layout.js");
     return executeLayout(args.slice(1));
+  }
+
+  if (args[0] === "model") {
+    const { executeModelProgram } = await import("./model-program.js");
+    return executeModelProgram(args.slice(1));
   }
 
   return invalidArguments(args);

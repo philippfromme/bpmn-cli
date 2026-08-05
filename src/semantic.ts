@@ -110,7 +110,7 @@ function containedChildren(
   return isModdleElement(value) ? [value] : [];
 }
 
-function collectElements(root: ModdleElement): ModdleElement[] {
+export function collectSemanticElements(root: ModdleElement): ModdleElement[] {
   const elements: ModdleElement[] = [];
   const visited = new Set<ModdleElement>();
 
@@ -194,7 +194,7 @@ export function createSemanticModel(options: {
     }
   }
 
-  const allElements = collectElements(options.definitions);
+  const allElements = collectSemanticElements(options.definitions);
   const byId = new Map<string, ModdleElement>();
 
   for (const element of allElements) {

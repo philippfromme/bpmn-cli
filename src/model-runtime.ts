@@ -1,17 +1,14 @@
 import { createHash } from "node:crypto";
 
-import { LayoutError, layoutProcess } from "bpmn-auto-layout";
 import type { ModdleElement } from "bpmn-moddle";
 
-import { semanticChanges } from "./diff.js";
 import {
   loadSemanticModelFromDocument,
   type ModelLoadOptions,
   type SourceDocument
 } from "./model-loader.js";
 import { replaceSourceFile, writeOutputFile } from "./output.js";
-import type { JsonObject } from "./project.js";
-import { semanticHash } from "./project.js";
+import { projectElement, semanticHash, type JsonObject } from "./project.js";
 import type { SemanticModel } from "./semantic.js";
 
 export interface ModelRuntimeOptions {
@@ -112,6 +109,48 @@ function assertNoIntroducedParseDiagnostics(
   }
 }
 
+function publicationChanges(
+  before: SemanticModel,
+  after: SemanticModel
+): JsonObject {
+  const beforeById = new Map(
+    before.allElements.flatMap((element) =>
+      element.id === undefined ? [] : [[element.id, element] as const]
+    )
+  );
+  const afterById = new Map(
+    after.allElements.flatMap((element) =>
+      element.id === undefined ? [] : [[element.id, element] as const]
+    )
+  );
+  const added = [...afterById]
+    .filter(([id]) => !beforeById.has(id))
+    .map(([, element]) => ({ element: projectElement(element).value }));
+  const removed = [...beforeById]
+    .filter(([id]) => !afterById.has(id))
+    .map(([, element]) => ({ element: projectElement(element).value }));
+  const changed = [...afterById]
+    .flatMap(([id, element]) => {
+      const previous = beforeById.get(id);
+      if (
+        previous === undefined ||
+        JSON.stringify(projectElement(previous).value) ===
+          JSON.stringify(projectElement(element).value)
+      ) {
+        return [];
+      }
+
+      return [{
+        $type: element.$type,
+        after: projectElement(element).value,
+        before: projectElement(previous).value,
+        elementRef: id
+      }];
+    });
+
+  return { added, changed, removed };
+}
+
 export async function serializeAndVerifyModel(
   before: SemanticModel,
   editable: SemanticModel,
@@ -128,11 +167,14 @@ export async function serializeAndVerifyModel(
     let laidOutXml: string;
 
     try {
+      const { layoutProcess } = await import("bpmn-auto-layout");
       laidOutXml = await layoutProcess(xml);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ModelPublicationError(
-        error instanceof LayoutError ? "LAYOUT_UNSUPPORTED" : "LAYOUT_FAILED",
+        error instanceof Error && error.name === "LayoutError"
+          ? "LAYOUT_UNSUPPORTED"
+          : "LAYOUT_FAILED",
         `Unable to layout BPMN: ${message}`
       );
     }
@@ -196,7 +238,7 @@ export async function publishModel(
   if (options.output === undefined) {
     await replaceSourceFile(source.path, verified.xml);
     return {
-      changes: semanticChanges(before, verified.model),
+      changes: publicationChanges(before, verified.model),
       destination: source.path,
       layout,
       outputSha256,
@@ -221,7 +263,7 @@ export async function publishModel(
   }
 
   return {
-    changes: semanticChanges(before, verified.model),
+    changes: publicationChanges(before, verified.model),
     destination: options.output,
     layout,
     outputSha256,

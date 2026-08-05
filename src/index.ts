@@ -4,16 +4,39 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 
-import { executeDiff, diffLimits } from "./diff.js";
 import { engines } from "./engines.js";
 import { executeInspect, inspectLimits } from "./inspect.js";
-import { executeLayout } from "./layout.js";
 import { executeLint, lintLimits } from "./lint.js";
 import { executeTrace, traceLimits } from "./trace.js";
+
+export {
+  BpmnModel,
+  CustomExtensionElement,
+  ModelApiError,
+  type CustomPropertyValue,
+  type CreateModelOptions,
+  type FormConfiguration,
+  type IoInput,
+  type OpenModelOptions
+} from "./model.js";
+export {
+  type ElementProperties,
+  type SupportedElementType,
+  type TypedModdleElement
+} from "./model-types.js";
+export {
+  ModelPublicationError,
+  type PublicationResult,
+  type PublishOptions
+} from "./model-runtime.js";
 
 interface PackageManifest {
   version: string;
 }
+
+const diffLimits = {
+  maxStdoutBytes: 32 * 1024
+} as const;
 
 export interface CliResult {
   exitCode: number;
@@ -295,10 +318,12 @@ async function executeHelp(args: readonly string[]): Promise<CliResult> {
   }
 
   if (args.length === 1 && args[0] === "diff") {
+    const { executeDiff } = await import("./diff.js");
     return executeDiff(["--help"]);
   }
 
   if (args.length === 1 && args[0] === "layout") {
+    const { executeLayout } = await import("./layout.js");
     return executeLayout(["--help"]);
   }
 
@@ -339,10 +364,12 @@ export async function execute(args: readonly string[]): Promise<CliResult> {
   }
 
   if (args[0] === "diff") {
+    const { executeDiff } = await import("./diff.js");
     return executeDiff(args.slice(1));
   }
 
   if (args[0] === "layout") {
+    const { executeLayout } = await import("./layout.js");
     return executeLayout(args.slice(1));
   }
 

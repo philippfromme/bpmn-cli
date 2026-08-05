@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 const require = createRequire(import.meta.url);
 
@@ -10,11 +10,8 @@ interface PackageManifest {
 }
 
 function manifestNear(moduleName: string): PackageManifest {
-  let directory = dirname(require.resolve(moduleName));
-
-  while (true) {
-    const manifestPath = join(directory, "package.json");
-
+  for (const directory of require.resolve.paths(moduleName) ?? []) {
+    const manifestPath = join(directory, moduleName, "package.json");
     if (existsSync(manifestPath)) {
       const manifest = JSON.parse(
         readFileSync(manifestPath, "utf8")
@@ -24,14 +21,9 @@ function manifestNear(moduleName: string): PackageManifest {
         return manifest;
       }
     }
-
-    const parent = dirname(directory);
-
-    if (parent === directory) {
-      throw new Error(`Unable to locate package manifest for "${moduleName}"`);
-    }
-    directory = parent;
   }
+
+  throw new Error(`Unable to locate package manifest for "${moduleName}"`);
 }
 
 export const engines = {

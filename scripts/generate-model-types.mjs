@@ -34,15 +34,38 @@ function propertyDeclaration(property) {
 const sources = await Promise.all(descriptors.map((path) => readFile(path, "utf8")));
 const digest = createHash("sha256").update(sources.join("\n")).digest("hex");
 const packages = sources.map((source) => JSON.parse(source));
-const typeEntries = packages
+const allTypeEntries = packages
   .flatMap((descriptor) =>
     descriptor.types.map((type) => ({
       prefix: descriptor.prefix,
-      properties: type.properties ?? [],
       type
     }))
-  )
+  );
+const typesByName = new Map(
+  allTypeEntries.map((entry) => [`${entry.prefix}:${entry.type.name}`, entry])
+);
+
+function inheritedProperties(entry, visited = new Set()) {
+  const typeName = `${entry.prefix}:${entry.type.name}`;
+  if (visited.has(typeName)) {
+    return [];
+  }
+  visited.add(typeName);
+
+  const inherited = (entry.type.superClass ?? []).flatMap((superType) => {
+    const name = superType.includes(":")
+      ? superType
+      : `${entry.prefix}:${superType}`;
+    const parent = typesByName.get(name);
+    return parent === undefined ? [] : inheritedProperties(parent, visited);
+  });
+  const properties = [...inherited, ...(entry.type.properties ?? [])];
+  return [...new Map(properties.map((property) => [property.name, property])).values()];
+}
+
+const typeEntries = allTypeEntries
   .filter(({ type }) => !type.isAbstract)
+  .map((entry) => ({ ...entry, properties: inheritedProperties(entry) }))
   .sort(({ prefix: leftPrefix, type: left }, { prefix: rightPrefix, type: right }) =>
     `${leftPrefix}:${left.name}`.localeCompare(`${rightPrefix}:${right.name}`)
   );

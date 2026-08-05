@@ -1,13 +1,12 @@
 # bpmn-cli
 
-Agent-first Node.js CLI and TypeScript library for BPMN inspection, tracing,
-fluent model construction, linting, semantic diffing, and deterministic layout.
-Business-semantic operations exclude Diagram Interchange, colors, and
-presentation-only modeler data.
+`bpmn-cli` is a focused TypeScript library for creating and safely changing BPMN
+models. It exposes a fluent semantic API rather than XML editing, a generic
+transaction DSL, or a command-line interface.
 
-The library API owns typed moddle construction, generated IDs, containment,
-reciprocal references, layout, reload verification, semantic change reporting,
-and atomic publication. It replaces generic JSON request-based mutation.
+The library owns moddle construction, generated IDs, containment, reciprocal
+flow references, optional deterministic layout, reload verification, semantic
+change reporting, and atomic publication.
 
 ```ts
 import { BpmnModel } from "@philippfromme/bpmn-cli";
@@ -15,9 +14,10 @@ import { BpmnModel } from "@philippfromme/bpmn-cli";
 const model = await BpmnModel.open("customer-support.bpmn");
 const task = model.element("ServiceTask_1");
 task.extensions.ensure("zeebe:IoMapping").addInput({
-  source: "xyz",
+  source: "=customer.id",
   target: "customerId"
 });
+
 await model.publish({
   output: "customer-support.edited.bpmn",
   layout: "auto",
@@ -25,11 +25,9 @@ await model.publish({
 });
 ```
 
-For usage details, see the [overview](docs/overview.md) and concise
-[agent skill](skills/bpmn-cli/SKILL.md).
-
-Discover focused model operations with `bpmn-cli api <topic> --json`, or run an
-explicit trusted ESM program through `bpmn-cli model examples/create-customer-email.mjs --json`.
+Use `BpmnModel.create()` to start a new definitions document. Create processes,
+activities, events, gateways, and flows through named methods; use
+`extensions.ensureCustom()` only for loaded custom moddle descriptors.
 
 ## Development
 
@@ -41,4 +39,5 @@ npm run lint
 npm test
 ```
 
-Run the compiled CLI with `node dist/index.js`.
+See the [API overview](docs/overview.md) for publication and extension safety
+contracts.

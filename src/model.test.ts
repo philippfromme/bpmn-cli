@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { BpmnModel, ModelApiError } from "./model.js";
+import { BpmnModel, ModelApiError } from "./index.js";
 import { ModelLoadError } from "./model-loader.js";
 import { ModelPublicationError } from "./model-runtime.js";
 import { loadSemanticModel } from "./model-loader.js";
@@ -53,6 +53,26 @@ test("creates and publishes a customer-email model with native form and Zeebe I/
       /zeebe:input source="=customer\.email" target="email"/
     );
     assert.equal((await BpmnModel.open(output)).element(task.id).name, "Send customer email");
+  });
+});
+
+test("uses deterministic layout by default during publication", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const output = join(directory, "laid-out.bpmn");
+    const model = await BpmnModel.create();
+    const process = model.process();
+    const start = model.create("bpmn:StartEvent", {});
+    const task = model.create("bpmn:Task", { name: "Send email" });
+    const end = model.create("bpmn:EndEvent", {});
+    model.append(process, start, "flowElements");
+    model.append(process, task, "flowElements");
+    model.append(process, end, "flowElements");
+    model.connect(start, task);
+    model.connect(task, end);
+
+    await model.publish({ output });
+
+    assert.match(await readFile(output, "utf8"), /bpmndi:BPMNDiagram/);
   });
 });
 

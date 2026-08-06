@@ -19,10 +19,17 @@ import {
 type ServiceTaskScalarProperties = Parameters<
   ModelElement<"bpmn:ServiceTask">["setProperties"]
 >[0];
+type GatewayReferenceProperties = Parameters<
+  ModelElement<"bpmn:ExclusiveGateway">["setReferences"]
+>[0];
 
 // @ts-expect-error Incoming sequence flows are references, not scalar properties.
 const invalidScalarProperties: ServiceTaskScalarProperties = { incoming: [] };
 void invalidScalarProperties;
+
+// @ts-expect-error Sequence-flow endpoints require connect() or rewire().
+const invalidReferenceProperties: GatewayReferenceProperties = { outgoing: [] };
+void invalidReferenceProperties;
 
 const zeebeFixture = fileURLToPath(
   new URL("../test/fixtures/AI Email Support Agent.bpmn", import.meta.url)
@@ -167,6 +174,29 @@ test("sets only descriptor-backed scalar properties on exact-ID elements", async
   assert.equal(task.raw.get("retryCounter"), "3");
   expectModelError("INVALID_PROPERTY", () =>
     task.setProperties({ id: "Renamed_task" } as never)
+  );
+});
+
+test("sets descriptor-backed references by exact target ID", async () => {
+  const model = await BpmnModel.create();
+  const process = model.process();
+  const gateway = model.create("bpmn:ExclusiveGateway", {});
+  const accepted = model.create("bpmn:EndEvent", {});
+  const rejected = model.create("bpmn:EndEvent", {});
+  model.append(process, gateway, "flowElements");
+  model.append(process, accepted, "flowElements");
+  model.append(process, rejected, "flowElements");
+  const acceptedFlow = model.connect(gateway, accepted);
+  const rejectedFlow = model.connect(gateway, rejected);
+
+  gateway.setReferences({ default: rejectedFlow.id });
+
+  assert.equal(gateway.raw.get("default"), rejectedFlow.raw);
+  expectModelError("ELEMENT_NOT_FOUND", () =>
+    gateway.setReferences({ default: "missing-flow" })
+  );
+  expectModelError("INVALID_PROPERTY", () =>
+    gateway.setReferences({ outgoing: [acceptedFlow.id] } as never)
   );
 });
 

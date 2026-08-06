@@ -1,4 +1,5 @@
 import { BpmnModdle, type ModdleElement } from "bpmn-moddle";
+import type { ModdleElement as DescriptorModdleElement } from "moddle";
 
 import {
   loadSemanticModelFromDocument,
@@ -57,6 +58,25 @@ export type ScalarProperties<Type extends SupportedElementType> = Partial<Pick<
   }[keyof ElementProperties<Type>]
 >>;
 
+type ReferencePropertyKeys<Properties> = {
+  [Property in keyof Properties]:
+    Property extends "incoming" | "outgoing" | "sourceRef" | "targetRef"
+      ? never
+      : NonNullable<Properties[Property]> extends
+          | DescriptorModdleElement<object>
+          | readonly DescriptorModdleElement<object>[]
+        ? Property
+        : never;
+}[keyof Properties];
+
+export type ReferenceProperties<Type extends SupportedElementType> = Partial<{
+  [Property in ReferencePropertyKeys<ElementProperties<Type>>]:
+    NonNullable<ElementProperties<Type>[Property]> extends
+      readonly DescriptorModdleElement<object>[]
+      ? readonly string[]
+      : string;
+}>;
+
 export class ModelApiError extends Error {
   constructor(
     readonly code:
@@ -101,6 +121,15 @@ function isScalarProperty(property: {
     property.isMany !== true &&
     property.isReference !== true &&
     ["Boolean", "Integer", "Real", "String"].includes(property.type)
+  );
+}
+
+function isManagedReciprocalReference(property: string): boolean {
+  return (
+    property === "incoming" ||
+    property === "outgoing" ||
+    property === "sourceRef" ||
+    property === "targetRef"
   );
 }
 
@@ -301,6 +330,41 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
         );
       }
       this.raw.set(property, value);
+    }
+    return this;
+  }
+
+  setReferences(references: ReferenceProperties<Type>): this {
+    for (const [property, value] of Object.entries(references)) {
+      const descriptor = typedDescriptorProperties(this.raw).find(
+        (candidate) => candidate.name === property
+      );
+      if (
+        descriptor === undefined ||
+        descriptor.isReference !== true ||
+        isManagedReciprocalReference(property) ||
+        (descriptor.isMany === true) !== Array.isArray(value)
+      ) {
+        throw new ModelApiError(
+          "INVALID_PROPERTY",
+          `${this.type}.${property} is not an editable reference property`
+        );
+      }
+
+      const ids = Array.isArray(value) ? value : [value];
+      const targets = ids.map((id) => this.model.element(id).raw);
+      const expectedType = descriptor.type.includes(":")
+        ? descriptor.type
+        : `${this.raw.$descriptor.ns.prefix ?? "bpmn"}:${descriptor.type}`;
+
+      if (!targets.every((target) => target.$instanceOf(expectedType))) {
+        throw new ModelApiError(
+          "INVALID_PROPERTY",
+          `${this.type}.${property} must reference ${expectedType} elements`
+        );
+      }
+
+      this.raw.set(property, descriptor.isMany === true ? targets : targets[0]);
     }
     return this;
   }

@@ -7,6 +7,7 @@ export {
   type FormConfiguration,
   type IoInput,
   type OpenModelOptions,
+  type ReferenceProperties,
   type ScalarProperties
 } from "./model.js";
 export {

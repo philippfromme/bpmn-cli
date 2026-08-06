@@ -96,6 +96,32 @@ characteristics, and `subProcess` or `adHocSubProcess` for subprocess nodes.
 current activity while keeping the main-flow cursor unchanged; the handler
 must end explicitly.
 
+## Generator scripts and local acceptance
+
+The executable scripts in [`examples/`](../examples) cover straight-through
+service work, human review, timeout and error handling, collaboration, and
+multi-instance work. Build before running one:
+
+```sh
+npm run build
+node examples/multi-instance-work.mjs bulk-dispatch.bpmn
+```
+
+Each script accepts an optional output path and writes its `PublicationResult`
+as JSON. `npm run test:generators` runs all five scripts and enforces a
+2,500-byte script-size ceiling, a 5,000 ms execution ceiling per script,
+successful publication, semantic-hash round trips plus scenario assertions,
+and the local BPMN/Zeebe moddle compatibility gate. The gate rejects parse
+warnings, unresolved references, and unsupported extension data. It validates
+serialized BPMN and Zeebe metadata rather than workflow execution.
+
+The fluent builder supports task type and I/O configuration, user-task form
+IDs, typed boundary handlers, pools/messages/message flows, and basic
+multi-instance characteristics. It intentionally does not provide user-task
+assignment/lifecycle settings, event subprocesses, or multi-instance
+collection/element-variable/output-element mappings. Collaboration construction
+is separate from process-flow construction.
+
 ## Open and change an existing model
 
 ```ts

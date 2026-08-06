@@ -158,9 +158,56 @@ IDs, foreign model elements, invalid containment, and invalid connections.
 
 ## Executable examples
 
+- [`examples/straight-through-service-flow.mjs`](examples/straight-through-service-flow.mjs):
+  two Zeebe service tasks in a straight-through flow.
+- [`examples/human-workflow.mjs`](examples/human-workflow.mjs): a form-backed
+  manager review with approved and default outcomes.
+- [`examples/exception-timeout-handling.mjs`](examples/exception-timeout-handling.mjs):
+  non-interrupting timer and error boundary handlers.
+- [`examples/collaboration.mjs`](examples/collaboration.mjs): pools, an exact
+  message reference, and a message flow.
+- [`examples/multi-instance-work.mjs`](examples/multi-instance-work.mjs):
+  parallel multi-instance service work with a completion condition.
 - [`src/model.test.ts`](src/model.test.ts): create, open, publish, and nested Zeebe I/O.
 - [`src/model-graph.test.ts`](src/model-graph.test.ts): connect, rewire, and remove.
 - [`src/model-extensions.test.ts`](src/model-extensions.test.ts): forms, I/O mappings, and custom descriptors.
+
+Build once, then invoke an example with its output path:
+
+```sh
+npm run build
+node examples/straight-through-service-flow.mjs generated-order-flow.bpmn
+```
+
+Every example prints its `PublicationResult` as JSON and writes only to the
+path supplied on the command line (or its documented default file name).
+
+## Generator acceptance metrics
+
+`npm run test:generators` executes each example using only this repository's
+local dependencies and fixtures. It is also included in `npm test`. The
+repeatable acceptance gates are:
+
+| Metric | Acceptance rule |
+| --- | --- |
+| Script size | Each example is at most 2,500 bytes. |
+| Execution time | Each isolated Node.js invocation completes within 5,000 ms. |
+| Publication | The script reports `status: "written"` and produces BPMN XML. |
+| Semantic fidelity | The published semantic hash equals the hash after reopening, and scenario-specific IDs, references, extensions, and loop settings are asserted. |
+| Camunda compatibility | The output passes the local BPMN and Zeebe moddle-descriptor gate with no parse warnings, unresolved references, or unsupported extension data. |
+
+The compatibility gate verifies serialized BPMN and Zeebe metadata; it does
+not execute a workflow.
+
+## Capability support and known gaps
+
+| Capability | Support |
+| --- | --- |
+| Straight-through Zeebe service flow | Supported, including task type, retries, I/O mappings, headers, and properties. |
+| Human workflow | Supported user tasks and Zeebe form IDs; assignment and lifecycle semantics are not modeled by the fluent API. |
+| Exception and timeout handling | Supported typed timer, error, escalation, message, and signal boundary events with explicit terminal handlers; event subprocesses are not fluent-builder nodes. |
+| Collaboration | Supported pools, root processes, messages, and exact message flows; process-flow construction is separate from the collaboration builder. |
+| Multi-instance work | Supported cardinality, completion condition, and sequential/parallel mode; collection, element-variable, and output-element mappings are not exposed by the fluent API. |
 
 For the full API contract and extension rules, see [the API overview](docs/overview.md).
 

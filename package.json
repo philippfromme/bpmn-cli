@@ -40,6 +40,7 @@
     "package:check": "npm run build && node scripts/check-package.mjs",
     "prepack": "npm run build",
     "test": "npm run build:test && node --test \"dist/*.test.js\" && npm run package:check",
+    "test:generators": "npm run build:test && node --test dist/generator-examples.test.js",
     "test:coverage": "npm run build:test && node --test --experimental-test-coverage --test-coverage-lines=70 --test-coverage-branches=85 --test-coverage-functions=75 \"dist/*.test.js\" && npm run package:check"
   },
   "devDependencies": {

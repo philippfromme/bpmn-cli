@@ -314,6 +314,11 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
     return this;
   }
 
+  renameId(id: string): this {
+    this.model.renameId(this, id);
+    return this;
+  }
+
   setProperties(properties: ScalarProperties<Type>): this {
     for (const [property, value] of Object.entries(properties)) {
       const descriptor = typedDescriptorProperties(this.raw).find(
@@ -849,6 +854,24 @@ export class BpmnModel {
     raw: TypedModdleElement<Type>
   ): ModelElement<Type> {
     return new ModelElement(this, raw);
+  }
+
+  renameId(element: ModelElement, id: string): void {
+    this.assertOwnedWrapper(element);
+    const currentId = element.id;
+    if (id === currentId) {
+      return;
+    }
+    if (this.ids.has(id)) {
+      throw new ModelApiError(
+        "ELEMENT_ID_CONFLICT",
+        `BPMN element ID "${id}" already exists`
+      );
+    }
+
+    element.raw.id = id;
+    this.ids.add(id);
+    this.refreshIndexes();
   }
 
   private allocateId(type: string): string {

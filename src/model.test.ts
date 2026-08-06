@@ -200,6 +200,25 @@ test("sets descriptor-backed references by exact target ID", async () => {
   );
 });
 
+test("renames exact IDs while preserving references and lookup indexes", async () => {
+  const model = await BpmnModel.create();
+  const process = model.process();
+  const source = model.create("bpmn:ServiceTask", {});
+  const target = model.create("bpmn:EndEvent", {});
+  model.append(process, source, "flowElements");
+  model.append(process, target, "flowElements");
+  const flow = model.connect(source, target);
+
+  source.renameId("Review_request");
+
+  assert.equal(source.id, "Review_request");
+  assert.equal(model.element("Review_request").raw, source.raw);
+  assert.equal(flow.raw.get("sourceRef"), source.raw);
+  expectModelError("ELEMENT_NOT_FOUND", () => model.element("ServiceTask_1"));
+  expectModelError("ELEMENT_ID_CONFLICT", () => target.renameId("Review_request"));
+  assert.equal(target.id, "EndEvent_1");
+});
+
 test("accesses contained extension elements through an exact-ID owner", async () => {
   const model = await BpmnModel.create();
   const process = model.process();

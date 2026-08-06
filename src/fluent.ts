@@ -1,5 +1,5 @@
 import {
-  BpmnModel,
+  BpmnEditor,
   ModelApiError,
   type IoInput,
   type ModelElement
@@ -165,7 +165,7 @@ export class ProcessBuilderError extends Error {
 }
 
 function createFlowNode(
-  model: BpmnModel,
+  model: BpmnEditor,
   process: ModelElement<"bpmn:Process">,
   source: ModelElement | undefined,
   type: FlowNodeType,
@@ -249,7 +249,7 @@ function timerValue(definition: Extract<EventDefinition, { type: "timer" }>): {
 }
 
 function existingRoot<Type extends "bpmn:Error" | "bpmn:Escalation" | "bpmn:Message" | "bpmn:Signal">(
-  model: BpmnModel,
+  model: BpmnEditor,
   type: Type,
   id: string
 ): ModelElement<Type> | undefined {
@@ -268,13 +268,13 @@ function existingRoot<Type extends "bpmn:Error" | "bpmn:Escalation" | "bpmn:Mess
   }
 }
 
-function message(model: BpmnModel, reference: MessageReference): ModelElement<"bpmn:Message"> {
+function message(model: BpmnEditor, reference: MessageReference): ModelElement<"bpmn:Message"> {
   nonEmpty(reference.id, "A message ID");
   return existingRoot(model, "bpmn:Message", reference.id) ??
     model.rootElement("bpmn:Message", { id: reference.id, name: reference.name });
 }
 
-function error(model: BpmnModel, reference: ErrorReference): ModelElement<"bpmn:Error"> {
+function error(model: BpmnEditor, reference: ErrorReference): ModelElement<"bpmn:Error"> {
   nonEmpty(reference.id, "An error ID");
   return existingRoot(model, "bpmn:Error", reference.id) ??
     model.rootElement("bpmn:Error", {
@@ -285,7 +285,7 @@ function error(model: BpmnModel, reference: ErrorReference): ModelElement<"bpmn:
 }
 
 function escalation(
-  model: BpmnModel,
+  model: BpmnEditor,
   reference: EscalationReference
 ): ModelElement<"bpmn:Escalation"> {
   nonEmpty(reference.id, "An escalation ID");
@@ -297,14 +297,14 @@ function escalation(
     });
 }
 
-function signal(model: BpmnModel, reference: SignalReference): ModelElement<"bpmn:Signal"> {
+function signal(model: BpmnEditor, reference: SignalReference): ModelElement<"bpmn:Signal"> {
   nonEmpty(reference.id, "A signal ID");
   return existingRoot(model, "bpmn:Signal", reference.id) ??
     model.rootElement("bpmn:Signal", { id: reference.id, name: reference.name });
 }
 
 function eventDefinition(
-  model: BpmnModel,
+  model: BpmnEditor,
   event: ModelElement,
   definition: EventDefinition
 ): void {
@@ -364,7 +364,7 @@ function eventDefinition(
 }
 
 function configureStandardLoop(
-  model: BpmnModel,
+  model: BpmnEditor,
   activity: ModelElement,
   options: StandardLoopOptions
 ): void {
@@ -384,7 +384,7 @@ function configureStandardLoop(
 }
 
 function configureMultiInstanceLoop(
-  model: BpmnModel,
+  model: BpmnEditor,
   activity: ModelElement,
   options: MultiInstanceLoopOptions
 ): void {
@@ -414,7 +414,7 @@ class BoundaryHandlerBuilder {
   private current: ModelElement;
 
   constructor(
-    private readonly model: BpmnModel,
+    private readonly model: BpmnEditor,
     private readonly process: ModelElement<"bpmn:Process">,
     boundary: ModelElement<"bpmn:BoundaryEvent">
   ) {
@@ -479,7 +479,7 @@ export class BranchBuilder {
   private joining = false;
 
   constructor(
-    private readonly model: BpmnModel,
+    private readonly model: BpmnEditor,
     private readonly process: ModelElement<"bpmn:Process">,
     private readonly gateway: ModelElement<GatewayType>,
     private readonly name: string,
@@ -630,9 +630,62 @@ export class ProcessBuilder {
   private terminal = false;
 
   constructor(
-    private readonly model: BpmnModel,
-    private readonly process: ModelElement<"bpmn:Process">
-  ) {}
+    private readonly model: BpmnEditor,
+    private readonly process: ModelElement<"bpmn:Process">,
+    state: {
+      current?: ModelElement;
+      defaultBranchClaimed?: boolean;
+      started?: boolean;
+      terminal?: boolean;
+    } = {}
+  ) {
+    this.current = state.current;
+    this.defaultBranchClaimed = state.defaultBranchClaimed ?? false;
+    this.started = state.started ?? false;
+    this.terminal = state.terminal ?? false;
+  }
+
+  static continue(
+    model: BpmnEditor,
+    process: ModelElement<"bpmn:Process">,
+    node: ModelElement
+  ): ProcessBuilder {
+    if (!process.isOwnedBy(model) || !node.isOwnedBy(model)) {
+      throw new ModelApiError(
+        "FOREIGN_ELEMENT",
+        "Process and node must belong to the editor receiving the composition"
+      );
+    }
+    if (
+      process.type !== "bpmn:Process" ||
+      !node.raw.$instanceOf("bpmn:FlowNode")
+    ) {
+      throw new ModelApiError(
+        "INVALID_CONNECTION",
+        "Process composition requires a BPMN process and flow node"
+      );
+    }
+    const flowElements = process.raw.get("flowElements");
+    if (
+      node.raw.$parent !== process.raw ||
+      !Array.isArray(flowElements) ||
+      !flowElements.includes(node.raw)
+    ) {
+      throw new ModelApiError(
+        "INVALID_CONTAINMENT",
+        "The selected flow node must be directly contained by the selected process"
+      );
+    }
+
+    return new ProcessBuilder(model, process, {
+      current: node,
+      defaultBranchClaimed:
+        (node.type === "bpmn:ExclusiveGateway" || node.type === "bpmn:InclusiveGateway") &&
+        node.raw.get("default") !== undefined,
+      started: true,
+      terminal: node.type === "bpmn:EndEvent"
+    });
+  }
 
   startEvent(id: string, options: NodeOptions = {}): this {
     if (this.started) {
@@ -976,7 +1029,7 @@ export class ProcessBuilder {
     return this.join(id, "bpmn:ExclusiveGateway", options);
   }
 
-  build(): BpmnModel {
+  build(): BpmnEditor {
     if (!this.started) {
       throw new ProcessBuilderError("START_EVENT_REQUIRED", "A process builder requires a start event");
     }
@@ -991,6 +1044,10 @@ export class ProcessBuilder {
 
   write(options: WriteOptions): Promise<WriteResult> {
     return this.build().write(options);
+  }
+
+  editor(): BpmnEditor {
+    return this.model;
   }
 
   private startWithEvent(id: string, definition: EventDefinition, options: NodeOptions): this {
@@ -1033,7 +1090,7 @@ export class ProcessBuilder {
 }
 
 function exactReference(
-  model: BpmnModel,
+  model: BpmnEditor,
   id: string,
   expectedType: string,
   property: string
@@ -1050,7 +1107,7 @@ function exactReference(
 
 export class CollaborationBuilder {
   constructor(
-    private readonly model: BpmnModel,
+    private readonly model: BpmnEditor,
     private readonly collaboration: ModelElement<"bpmn:Collaboration">
   ) {}
 
@@ -1097,12 +1154,16 @@ export class CollaborationBuilder {
     return this;
   }
 
-  build(): BpmnModel {
+  build(): BpmnEditor {
     return this.model;
   }
 
   write(options: WriteOptions): Promise<WriteResult> {
     return this.build().write(options);
+  }
+
+  editor(): BpmnEditor {
+    return this.model;
   }
 }
 
@@ -1111,7 +1172,7 @@ export const Bpmn = {
     id: string,
     options: ProcessOptions = {}
   ): Promise<ProcessBuilder> {
-    const model = await BpmnModel.create();
+    const model = await BpmnEditor.create();
     return new ProcessBuilder(model, model.process({
       id,
       isExecutable: options.isExecutable ?? true,
@@ -1123,7 +1184,7 @@ export const Bpmn = {
     id: string,
     options: CollaborationOptions = {}
   ): Promise<CollaborationBuilder> {
-    const model = await BpmnModel.create();
+    const model = await BpmnEditor.create();
     return new CollaborationBuilder(model, model.rootElement("bpmn:Collaboration", {
       id,
       isClosed: options.isClosed,

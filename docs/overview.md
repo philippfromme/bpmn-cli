@@ -59,9 +59,10 @@ await process
 ```
 
 Exclusive and inclusive branches must begin with `condition(expression)` or
-`defaultFlow()` and end with `endEvent()` or `join()`. `build()` returns the
-underlying `BpmnModel` when a script needs the lower-level exact-ID API before
-writing. `write()` retains the standard validation, deterministic
+`defaultFlow()` and end with `endEvent()` or `join()`. `editor()` returns the
+shared `BpmnEditor` when a script needs the lower-level exact-ID API before
+writing. `build()` validates fluent completion and returns that same editor.
+`write()` retains the standard validation, deterministic
 auto-layout, semantic verification, and atomic-output behavior.
 
 ## Branch joins, events, and loops
@@ -125,9 +126,9 @@ is separate from process-flow construction.
 ## Open and change an existing model
 
 ```ts
-import { BpmnModel } from "@philippfromme/bpmn-cli";
+import { BpmnEditor } from "@philippfromme/bpmn-cli";
 
-const model = await BpmnModel.open("customer-support.bpmn");
+const model = await BpmnEditor.open("customer-support.bpmn");
 const task = model.element("ServiceTask_1");
 task.extensions.ensure("zeebe:IoMapping").addInput({
   source: "=customer.id",
@@ -147,10 +148,16 @@ with the active profiles, verifies semantic equivalence, reports changes, and
 atomically writes the output. It never needs JSON Pointer paths, request files,
 manual reciprocal-reference maintenance, or external plan hashes.
 
+Use `composeProcess(processId).at(nodeId)` to hand an exact-ID editor back to
+the fluent process builder. Both IDs are required: `at` accepts only a flow
+node directly contained by the selected process, so it never infers a cursor.
+An end-event target remains terminal, and an existing exclusive or inclusive
+gateway default flow remains claimed.
+
 ## Create a model
 
 ```ts
-const model = await BpmnModel.create();
+const model = await BpmnEditor.create();
 const process = model.process({ name: "Customer email" });
 const task = model.create("bpmn:UserTask", { name: "Send customer email" });
 model.append(process, task, "flowElements");
@@ -171,7 +178,7 @@ For custom extensions, provide a moddle descriptor when opening the model and
 use the descriptor-validated escape hatch:
 
 ```ts
-const model = await BpmnModel.open("model.bpmn", {
+const model = await BpmnEditor.open("model.bpmn", {
   extensions: ["acme=acme-moddle.json"]
 });
 const settings = model.element("Task_1").extensions.ensureCustom(

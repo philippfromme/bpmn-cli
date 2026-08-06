@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
-import { BpmnModel, ModelApiError } from "./index.js";
+import { BpmnEditor, ModelApiError } from "./index.js";
 import { ModelLoadError } from "./model-loader.js";
 import {
   expectModelError,
@@ -12,7 +12,7 @@ import {
 } from "./test-support.test.js";
 
 test("creates models with configured definitions and collision-safe identifiers", async () => {
-  const model = await BpmnModel.create({
+  const model = await BpmnEditor.create({
     id: "Definitions_Custom",
     targetNamespace: "https://acme.test/bpmn"
   });
@@ -31,7 +31,7 @@ test("creates models with configured definitions and collision-safe identifiers"
 });
 
 test("requires an explicit destination when writing an in-memory model", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   model.process();
 
   await assert.rejects(
@@ -48,13 +48,13 @@ test("loads exact IDs and reports source errors with stable codes", async () => 
       "model.bpmn",
       '  <bpmn:process id="Process_1"><bpmn:task id="Task_1" name="Review"/></bpmn:process>'
     );
-    const model = await BpmnModel.open(source);
+    const model = await BpmnEditor.open(source);
 
     assert.equal(model.element("Task_1").name, "Review");
     expectModelError("ELEMENT_NOT_FOUND", () => model.element("task_1"));
 
     await assert.rejects(
-      BpmnModel.open(join(directory, "missing.bpmn")),
+      BpmnEditor.open(join(directory, "missing.bpmn")),
       (error: unknown) =>
         error instanceof ModelLoadError && error.code === "SOURCE_READ_FAILED"
     );
@@ -62,7 +62,7 @@ test("loads exact IDs and reports source errors with stable codes", async () => 
     const invalidEncoding = join(directory, "invalid-encoding.bpmn");
     await writeFile(invalidEncoding, Buffer.from([0xff, 0xfe, 0xfd]));
     await assert.rejects(
-      BpmnModel.open(invalidEncoding),
+      BpmnEditor.open(invalidEncoding),
       (error: unknown) =>
         error instanceof ModelLoadError && error.code === "SOURCE_DECODE_FAILED"
     );
@@ -70,7 +70,7 @@ test("loads exact IDs and reports source errors with stable codes", async () => 
 });
 
 test("keeps ID reservations after attachment, removal, and index refreshes", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const process = model.process();
   const first = model.create("bpmn:Task", {});
   model.append(process, first, "flowElements");
@@ -83,7 +83,7 @@ test("keeps ID reservations after attachment, removal, and index refreshes", asy
 });
 
 test("rejects invalid or ambiguous containment without changing either parent", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const first = model.process({ id: "Process_First" });
   const second = model.process({ id: "Process_Second" });
   const task = model.create("bpmn:Task", {});
@@ -107,7 +107,7 @@ test("rejects invalid or ambiguous containment without changing either parent", 
 test("preserves explicit target namespace through write", async () => {
   await withTemporaryDirectory("bpmn-target-namespace", async (directory) => {
     const output = join(directory, "model.bpmn");
-    const model = await BpmnModel.create({
+    const model = await BpmnEditor.create({
       targetNamespace: "https://acme.test/processes"
     });
     model.process();

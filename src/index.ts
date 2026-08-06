@@ -1,5 +1,5 @@
 export {
-  BpmnModel,
+  BpmnEditor,
   CustomExtensionElement,
   ModelApiError,
   type CreateModelOptions,

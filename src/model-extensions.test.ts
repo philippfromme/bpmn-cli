@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
-import { BpmnModel } from "./index.js";
+import { BpmnEditor } from "./index.js";
 import {
   expectModelError,
   isModdleElement,
@@ -14,7 +14,7 @@ import {
 } from "./test-support.test.js";
 
 test("ensures one I/O mapping, retains inputs, and rejects invalid input values", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const process = model.process();
   const task = model.create("bpmn:UserTask", {});
   model.append(process, task, "flowElements");
@@ -49,7 +49,7 @@ test("ensures one I/O mapping, retains inputs, and rejects invalid input values"
 });
 
 test("allows I/O mappings only on Zeebe-supported BPMN elements", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const process = model.process();
   const task = model.create("bpmn:Task", {});
   const serviceTask = model.create("bpmn:ServiceTask", {});
@@ -69,7 +69,7 @@ test("allows I/O mappings only on Zeebe-supported BPMN elements", async () => {
 });
 
 test("configures forms only on user tasks and retains existing form properties", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const process = model.process();
   const userTask = model.create("bpmn:UserTask", {});
   const serviceTask = model.create("bpmn:ServiceTask", {});
@@ -123,7 +123,7 @@ test("validates descriptor-backed custom extension construction and nested conta
       "model.bpmn",
       '  <bpmn:process id="Process_1"><bpmn:task id="Task_1"/></bpmn:process>'
     );
-    const model = await BpmnModel.open(source, { extensions: [`acme=${descriptor}`] });
+    const model = await BpmnEditor.open(source, { extensions: [`acme=${descriptor}`] });
     const settings = model.element("Task_1").extensions.ensureCustom(
       "acme:Settings",
       { priority: "normal" }
@@ -156,7 +156,7 @@ test("opens declared Zeebe extensions automatically", async () => {
       '  <bpmn:process id="Process_1"><bpmn:userTask id="Task_1"/></bpmn:process>',
       ` xmlns:zeebe="${ZEEBE_NAMESPACE}"`
     );
-    const model = await BpmnModel.open(source);
+    const model = await BpmnEditor.open(source);
     model.element("Task_1").extensions.ensure("zeebe:IoMapping").addInput({
       source: "=customer.id",
       target: "customerId"

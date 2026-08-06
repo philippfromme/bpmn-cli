@@ -70,14 +70,14 @@ try {
   const consumerTypeScript = join(consumerRoot, "consumer.ts");
   await writeFile(
     consumerJavaScript,
-    `import { BpmnModel } from "@philippfromme/bpmn-cli";
-if (typeof BpmnModel !== "function") throw new Error("BpmnModel export missing");`,
+    `import { BpmnEditor } from "@philippfromme/bpmn-cli";
+if (typeof BpmnEditor !== "function") throw new Error("BpmnEditor export missing");`,
     "utf8"
   );
   await writeFile(
     consumerTypeScript,
     `import {
-  BpmnModel,
+  BpmnEditor,
   type ElementProperties,
   type WriteOptions
 } from "@philippfromme/bpmn-cli";
@@ -85,7 +85,7 @@ const options: WriteOptions = { layout: "none" };
 const task: ElementProperties<"bpmn:ServiceTask"> = { retryCounter: "3" };
 void options;
 void task;
-void BpmnModel.create;`,
+void BpmnEditor.create;`,
     "utf8"
   );
 

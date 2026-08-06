@@ -3,7 +3,13 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
-import { Bpmn, BpmnModel, ModelApiError, ProcessBuilderError } from "./index.js";
+import {
+  Bpmn,
+  BpmnEditor,
+  ModelApiError,
+  ProcessBuilder,
+  ProcessBuilderError
+} from "./index.js";
 import {
   isModdleElement,
   moddleElements,
@@ -39,7 +45,7 @@ test("builds, writes, and reloads a collaboration with exact ID references", asy
     const result = await collaboration.write({ layout: "none", output });
     const buyer = model.element<"bpmn:Participant">("Participant_buyer");
     const flow = model.element<"bpmn:MessageFlow">("MessageFlow_order");
-    const reopened = await BpmnModel.open(output);
+    const reopened = await BpmnEditor.open(output);
 
     assert.equal(result.status, "written");
     assert.equal(model.element("Collaboration_order").name, "Order collaboration");
@@ -59,6 +65,134 @@ test("builds, writes, and reloads a collaboration with exact ID references", asy
       reopened.element("Message_order").raw
     );
   });
+});
+
+test("hands fluent builders to their shared editor", async () => {
+  await withTemporaryDirectory("bpmn-builder-editor", async (directory) => {
+    const output = join(directory, "shared-editor.bpmn");
+    const process = await Bpmn.createProcess("Process_shared");
+    const editor = process
+      .startEvent("Start_shared")
+      .userTask("Task_shared")
+      .endEvent("End_shared")
+      .editor();
+
+    editor.element("Task_shared").setName("Changed through editor");
+    assert.equal(process.editor(), editor);
+    assert.equal(process.build(), editor);
+
+    const result = await process.write({ output });
+    const reopened = await BpmnEditor.open(output);
+
+    assert.equal(result.status, "written");
+    assert.equal(reopened.element("Task_shared").name, "Changed through editor");
+
+    const collaboration = await Bpmn.createCollaboration("Collaboration_shared");
+    const collaborationEditor = collaboration.process("Process_pool").editor();
+
+    collaborationEditor.rootElement("bpmn:Message", {
+      id: "Message_shared",
+      name: "Shared editor message"
+    });
+
+    assert.equal(collaboration.editor(), collaborationEditor);
+    assert.equal(collaboration.build(), collaborationEditor);
+    assert.equal(collaborationEditor.element("Message_shared").name, "Shared editor message");
+  });
+});
+
+test("continues an exact editor process from an explicit flow node", async () => {
+  await withTemporaryDirectory("bpmn-editor-compose", async (directory) => {
+    const output = join(directory, "continued.bpmn");
+    const editor = await BpmnEditor.create();
+    const process = editor.process({ id: "Process_continue" });
+    const start = editor.create("bpmn:StartEvent", { id: "Start_continue" });
+    const selected = editor.create("bpmn:UserTask", { id: "Task_continue" });
+    const unrelated = editor.create("bpmn:UserTask", { id: "Task_unrelated" });
+
+    editor.append(process, start, "flowElements");
+    editor.append(process, selected, "flowElements");
+    editor.append(process, unrelated, "flowElements");
+    editor.connect(start, selected);
+
+    const continuation = editor
+      .composeProcess("Process_continue")
+      .at("Task_continue")
+      .serviceTask("Task_next", { taskType: "continue" })
+      .endEvent("End_continue");
+    const result = await continuation.write({ output });
+    const reopened = await BpmnEditor.open(output);
+    const next = reopened.element("Task_next");
+
+    assert.equal(result.status, "written");
+    assert.equal(
+      moddleElements(next.raw.get("incoming"))[0]?.get("sourceRef"),
+      reopened.element("Task_continue").raw
+    );
+    assert.equal(
+      moddleElements(reopened.element("End_continue").raw.get("incoming"))[0]?.get("sourceRef"),
+      next.raw
+    );
+    assert.equal(reopened.element("Task_unrelated").type, "bpmn:UserTask");
+  });
+});
+
+test("rejects invalid process composition targets and preserves terminal and branch state", async () => {
+  const editor = await BpmnEditor.create();
+  const foreignEditor = await BpmnEditor.create();
+  const first = editor.process({ id: "Process_first" });
+  const second = editor.process({ id: "Process_second" });
+  const start = editor.create("bpmn:StartEvent", { id: "Start_first" });
+  const gateway = editor.create("bpmn:ExclusiveGateway", { id: "Gateway_first" });
+  const defaultEnd = editor.create("bpmn:EndEvent", { id: "End_default" });
+  const terminal = editor.create("bpmn:EndEvent", { id: "End_terminal" });
+  const otherTask = editor.create("bpmn:UserTask", { id: "Task_second" });
+
+  for (const node of [start, gateway, defaultEnd, terminal]) {
+    editor.append(first, node, "flowElements");
+  }
+  editor.append(second, otherTask, "flowElements");
+  editor.connect(start, gateway);
+  const defaultFlow = editor.connect(gateway, defaultEnd);
+  editor.setDefaultFlow(gateway, defaultFlow);
+
+  assert.throws(
+    () => ProcessBuilder.continue(editor, foreignEditor.process({ id: "Process_foreign" }), start),
+    (error: unknown) => error instanceof ModelApiError && error.code === "FOREIGN_ELEMENT"
+  );
+  assert.throws(
+    () => editor.composeProcess("missing"),
+    (error: unknown) => error instanceof ModelApiError && error.code === "ELEMENT_NOT_FOUND"
+  );
+  assert.throws(
+    () => editor.composeProcess("Gateway_first"),
+    (error: unknown) => error instanceof ModelApiError && error.code === "INVALID_PROPERTY"
+  );
+  assert.throws(
+    () => editor.composeProcess("Process_first").at("missing"),
+    (error: unknown) => error instanceof ModelApiError && error.code === "ELEMENT_NOT_FOUND"
+  );
+  assert.throws(
+    () => editor.composeProcess("Process_first").at(defaultFlow.id),
+    (error: unknown) => error instanceof ModelApiError && error.code === "INVALID_CONNECTION"
+  );
+  assert.throws(
+    () => editor.composeProcess("Process_first").at("Task_second"),
+    (error: unknown) => error instanceof ModelApiError && error.code === "INVALID_CONTAINMENT"
+  );
+  assert.throws(
+    () => editor.composeProcess("Process_first").at("End_terminal").userTask("after-end"),
+    (error: unknown) =>
+      error instanceof ProcessBuilderError && error.code === "PROCESS_COMPLETE"
+  );
+  assert.throws(
+    () => editor.composeProcess("Process_first").at("Gateway_first").branch(
+      "another-default",
+      (branch) => branch.defaultFlow().endEvent("End_another")
+    ),
+    (error: unknown) =>
+      error instanceof ProcessBuilderError && error.code === "DUPLICATE_DEFAULT_BRANCH"
+  );
 });
 
 test("rejects missing and mistyped collaboration reference IDs before mutation", async () => {
@@ -105,7 +239,7 @@ test("rejects missing and mistyped collaboration reference IDs before mutation",
   );
 
   const model = builder.build();
-  const foreignModel = await BpmnModel.create();
+  const foreignModel = await BpmnEditor.create();
   const foreignCollaboration = foreignModel.rootElement("bpmn:Collaboration", {
     id: "Collaboration_foreign"
   });

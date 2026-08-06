@@ -11,7 +11,7 @@ layout engine, semantic verifier, and atomic output path:
 | API | Use it for |
 | --- | --- |
 | `Bpmn` | Concise, semantic generator scripts for processes and collaborations. |
-| `BpmnModel` | Exact-ID editing of existing models and the full bundled BPMN/Zeebe descriptor surface. |
+| `BpmnEditor` | Exact-ID editing of existing models and the full bundled BPMN/Zeebe descriptor surface. |
 
 ## Install
 
@@ -81,17 +81,18 @@ await collaboration
 
 `CollaborationBuilder` deliberately does not share cursor state with
 `ProcessBuilder`. Participants, messages, and message-flow endpoints use exact
-IDs.
+IDs. Both builders expose their shared `BpmnEditor` through `editor()` when a
+script needs exact-ID edits before writing.
 
 ## Edit an existing model
 
-`BpmnModel` is the universal editor. It uses descriptor-checked properties,
+`BpmnEditor` is the universal editor. It uses descriptor-checked properties,
 exact IDs, and typed contained children instead of XML manipulation.
 
 ```ts
-import { BpmnModel } from "@philippfromme/bpmn-cli";
+import { BpmnEditor } from "@philippfromme/bpmn-cli";
 
-const model = await BpmnModel.open("customer-support.bpmn");
+const model = await BpmnEditor.open("customer-support.bpmn");
 const task = model.element<"bpmn:ServiceTask">("SendReply");
 
 task.setName("Send customer reply");
@@ -112,10 +113,25 @@ connect/rewire/remove, and safe boundary-event attachment. It also exposes
 Zeebe helpers for forms, subscriptions, called decisions/elements, scripts,
 and multi-instance settings.
 
+To resume fluent topology construction after exact-ID editing, select both
+targets explicitly; no cursor is inferred:
+
+```ts
+await model
+  .composeProcess("CustomerSupport")
+  .at("SendReply")
+  .endEvent("ReplySent")
+  .write({ output: "customer-support.completed.bpmn" });
+```
+
+The selected node must be a flow node directly contained by the selected
+process. Continuing from an end event is terminal, and an existing gateway
+default flow remains claimed.
+
 Custom moddle extensions require a loaded descriptor:
 
 ```ts
-const model = await BpmnModel.open("model.bpmn", {
+const model = await BpmnEditor.open("model.bpmn", {
   extensions: ["acme=acme-moddle.json"]
 });
 
@@ -133,7 +149,7 @@ unsupported extension data rather than silently dropping it.
 
 ```ts
 await model.write({
-  output: "edited.bpmn", // required for BpmnModel.create()
+  output: "edited.bpmn", // required for BpmnEditor.create()
   layout: "auto",        // default; use "none" to preserve imported DI
   validate: true,        // default
   force: false           // default; refuses replacement
@@ -174,7 +190,7 @@ Camunda runtime.
 
 ## Scope and current gaps
 
-The universal `BpmnModel` editor covers bundled BPMN, BPMNDI/DC/DI, and Zeebe
+The universal `BpmnEditor` covers bundled BPMN, BPMNDI/DC/DI, and Zeebe
 descriptor-backed properties. The fluent API is intentionally curated, not a
 mirror of every descriptor. Current fluent gaps include assignment/lifecycle
 settings, event subprocesses, and multi-instance element/output mappings.

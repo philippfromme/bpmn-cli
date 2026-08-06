@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { BpmnModel, ModelApiError } from "./index.js";
+import { BpmnEditor, ModelApiError } from "./index.js";
 import { ModelLoadError } from "./model-loader.js";
 import type { ModelElement } from "./model.js";
 import { ModelWriteError } from "./model-runtime.js";
@@ -66,7 +66,7 @@ async function withTemporaryDirectory(
 test("creates and writes a customer-email model with native form and Zeebe I/O", async () => {
   await withTemporaryDirectory(async (directory) => {
     const output = join(directory, "customer-email.bpmn");
-    const model = await BpmnModel.create();
+    const model = await BpmnEditor.create();
     const process = model.process({ name: "Customer email" });
     const task = model.create("bpmn:UserTask", { name: "Send customer email" });
     model.append(process, task, "flowElements");
@@ -89,14 +89,14 @@ test("creates and writes a customer-email model with native form and Zeebe I/O",
       xml,
       /zeebe:input source="=customer\.email" target="email"/
     );
-    assert.equal((await BpmnModel.open(output)).element(task.id).name, "Send customer email");
+    assert.equal((await BpmnEditor.open(output)).element(task.id).name, "Send customer email");
   });
 });
 
 test("uses deterministic layout by default during write", async () => {
   await withTemporaryDirectory(async (directory) => {
     const output = join(directory, "laid-out.bpmn");
-    const model = await BpmnModel.create();
+    const model = await BpmnEditor.create();
     const process = model.process();
     const start = model.create("bpmn:StartEvent", {});
     const task = model.create("bpmn:Task", { name: "Send email" });
@@ -129,7 +129,7 @@ test("adds nested Zeebe I/O mappings to an existing task without replacing exten
 </bpmn:definitions>`,
       "utf8"
     );
-    const model = await BpmnModel.open(source);
+    const model = await BpmnEditor.open(source);
     model.element("ServiceTask_1").extensions.ensure("zeebe:IoMapping").addInput({
       source: "xyz",
       target: "customerId"
@@ -143,7 +143,7 @@ test("adds nested Zeebe I/O mappings to an existing task without replacing exten
 });
 
 test("maintains sequence-flow reciprocal references while rewiring and removing", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const process = model.process();
   const first = model.create("bpmn:Task", {});
   const second = model.create("bpmn:Task", {});
@@ -165,7 +165,7 @@ test("maintains sequence-flow reciprocal references while rewiring and removing"
 test("attaches and reattaches boundary events through a dedicated operation", async () => {
   await withTemporaryDirectory(async (directory) => {
     const output = join(directory, "boundary-event.bpmn");
-    const model = await BpmnModel.create();
+    const model = await BpmnEditor.create();
     const process = model.process();
     const firstTask = model.create("bpmn:ServiceTask", {});
     const secondTask = model.create("bpmn:ServiceTask", {});
@@ -183,7 +183,7 @@ test("attaches and reattaches boundary events through a dedicated operation", as
     assert.deepEqual(secondTask.raw.get("boundaryEventRefs"), [boundary.raw]);
 
     await model.write({ layout: "none", output, validate: true });
-    const reopened = await BpmnModel.open(output);
+    const reopened = await BpmnEditor.open(output);
     assert.equal(
       reopened.element(boundary.id).raw.get("attachedToRef"),
       reopened.element(secondTask.id).raw
@@ -192,7 +192,7 @@ test("attaches and reattaches boundary events through a dedicated operation", as
 });
 
 test("reserves generated IDs for unattached elements", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const deferred = model.create("bpmn:Task", {});
 
   model.process();
@@ -203,7 +203,7 @@ test("reserves generated IDs for unattached elements", async () => {
 });
 
 test("sets only descriptor-backed scalar properties on exact-ID elements", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const process = model.process();
   const task = model.create("bpmn:ServiceTask", {});
   model.append(process, task, "flowElements");
@@ -223,7 +223,7 @@ test("sets only descriptor-backed scalar properties on exact-ID elements", async
 });
 
 test("sets descriptor-backed references by exact target ID", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const process = model.process();
   const gateway = model.create("bpmn:ExclusiveGateway", {});
   const accepted = model.create("bpmn:EndEvent", {});
@@ -246,7 +246,7 @@ test("sets descriptor-backed references by exact target ID", async () => {
 });
 
 test("renames exact IDs while preserving references and lookup indexes", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const process = model.process();
   const source = model.create("bpmn:ServiceTask", {});
   const target = model.create("bpmn:EndEvent", {});
@@ -265,7 +265,7 @@ test("renames exact IDs while preserving references and lookup indexes", async (
 });
 
 test("accesses contained extension elements through an exact-ID owner", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const process = model.process();
   const task = model.create("bpmn:ServiceTask", {});
   model.append(process, task, "flowElements");
@@ -282,7 +282,7 @@ test("accesses contained extension elements through an exact-ID owner", async ()
 });
 
 test("creates contained Zeebe extension children through an exact-ID owner", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const process = model.process();
   const task = model.create("bpmn:ServiceTask", {});
   model.append(process, task, "flowElements");
@@ -305,7 +305,7 @@ test("creates contained Zeebe extension children through an exact-ID owner", asy
 });
 
 test("removes a contained child through its exact-ID owner", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const process = model.process();
   const task = model.create("bpmn:ServiceTask", {});
   model.append(process, task, "flowElements");
@@ -325,11 +325,11 @@ test("removes a contained child through its exact-ID owner", async () => {
 });
 
 test("rejects wrappers from another model without mutating either graph", async () => {
-  const firstModel = await BpmnModel.create();
+  const firstModel = await BpmnEditor.create();
   const firstProcess = firstModel.process();
   const firstTask = firstModel.create("bpmn:Task", {});
   firstModel.append(firstProcess, firstTask, "flowElements");
-  const secondModel = await BpmnModel.create();
+  const secondModel = await BpmnEditor.create();
   const secondTask = secondModel.create("bpmn:Task", {});
 
   const expectsForeignElement = (operation: () => void): void => {
@@ -359,7 +359,7 @@ test("excludes descriptor traits from constructible types while merging trait fi
 });
 
 test("rejects ambiguous lookup and in-use element removal", async () => {
-  const model = await BpmnModel.create();
+  const model = await BpmnEditor.create();
   const process = model.process();
   const first = model.create("bpmn:Task", {});
   const second = model.create("bpmn:Task", {});
@@ -416,7 +416,7 @@ test("writes loaded custom extension descriptors without JSON Pointer mutation",
 </bpmn:definitions>`,
       "utf8"
     );
-    const model = await BpmnModel.open(source, {
+    const model = await BpmnEditor.open(source, {
       extensions: [`acme=${descriptor}`]
     });
     const settings = model.element("Task_1").extensions.ensureCustom(
@@ -449,7 +449,7 @@ test("refuses write when extension data has no loaded descriptor", async () => {
       "utf8"
     );
 
-    const model = await BpmnModel.open(source);
+    const model = await BpmnEditor.open(source);
     await assert.rejects(
       model.write({ layout: "none", output }),
       (error: unknown) =>
@@ -473,7 +473,7 @@ test("rejects malformed extension XML while opening a model", async () => {
     );
 
     await assert.rejects(
-      BpmnModel.open(source),
+      BpmnEditor.open(source),
       (error: unknown) =>
         error instanceof ModelLoadError && error.code === "BPMN_PARSE_FAILED"
     );
@@ -484,7 +484,7 @@ test("preserves existing output when atomic write rejects replacement", async ()
   await withTemporaryDirectory(async (directory) => {
     const output = join(directory, "existing.bpmn");
     await writeFile(output, "unchanged", "utf8");
-    const model = await BpmnModel.create();
+    const model = await BpmnEditor.create();
     model.process();
 
     await assert.rejects(
@@ -505,7 +505,7 @@ test("preserves semantic hashes when replacing only DI", async () => {
       extensions: [],
       file: zeebeFixture
     });
-    const model = await BpmnModel.open(zeebeFixture);
+    const model = await BpmnEditor.open(zeebeFixture);
     const result = await model.write({ layout: "none", output });
     const after = await loadSemanticModel({
       autoProfile: true,

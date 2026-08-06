@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { basename, join } from "node:path";
 import test from "node:test";
 
-import { BpmnModel } from "./index.js";
+import { BpmnEditor } from "./index.js";
 import { loadSemanticModel } from "./model-loader.js";
 import { isModdleElement, moddleElements } from "./test-support.test.js";
 
@@ -16,10 +16,10 @@ const maxExecutionMilliseconds = 5_000;
 
 interface GeneratorExample {
   name: string;
-  assertSemantics(model: BpmnModel): void;
+  assertSemantics(model: BpmnEditor): void;
 }
 
-function serviceTaskType(model: BpmnModel, id: string): string | undefined {
+function serviceTaskType(model: BpmnEditor, id: string): string | undefined {
   const extensions = model.element(id).raw.get("extensionElements");
   if (!isModdleElement(extensions)) return undefined;
   const definition = moddleElements(extensions.get("values")).find(
@@ -29,7 +29,7 @@ function serviceTaskType(model: BpmnModel, id: string): string | undefined {
   return typeof taskType === "string" ? taskType : undefined;
 }
 
-function hasBoundaryReference(model: BpmnModel, activityId: string, boundaryId: string): boolean {
+function hasBoundaryReference(model: BpmnEditor, activityId: string, boundaryId: string): boolean {
   return moddleElements(model.element(activityId).raw.get("boundaryEventRefs")).some(
     (boundary) => boundary.id === boundaryId
   );
@@ -114,7 +114,7 @@ test("generator examples meet repeatable local acceptance metrics", async () => 
         status: string;
       };
       const outputXml = await readFile(output, "utf8");
-      const reloaded = await BpmnModel.open(output);
+      const reloaded = await BpmnEditor.open(output);
       const localCamundaModel = await loadSemanticModel({
         autoProfile: true,
         extensions: [],

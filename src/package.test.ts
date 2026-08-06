@@ -25,5 +25,5 @@ test("writes a resolvable fluent API entry point", async () => {
   await access(fileURLToPath(new URL("./index.js", import.meta.url)));
   const library = await import("./index.js");
   assert.equal(typeof library.Bpmn, "object");
-  assert.equal(typeof library.BpmnModel, "function");
+  assert.equal(typeof library.BpmnEditor, "function");
 });

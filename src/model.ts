@@ -23,6 +23,7 @@ import {
 import { typedDescriptorProperties } from "./moddle.js";
 import { resolveProfiles } from "./profiles.js";
 import { collectSemanticElements, type SemanticModel } from "./semantic.js";
+import { ProcessBuilder } from "./fluent.js";
 
 export type OpenModelOptions = ModelRuntimeOptions;
 
@@ -175,7 +176,7 @@ function hasReference(element: ModdleElement, target: ModdleElement): boolean {
 
 export class IoMappingBuilder {
   constructor(
-    private readonly model: BpmnModel,
+    private readonly model: BpmnEditor,
     readonly raw: TypedModdleElement<"zeebe:IoMapping">
   ) {}
 
@@ -208,7 +209,7 @@ export class IoMappingBuilder {
 
 export class ExtensionElementsBuilder {
   constructor(
-    private readonly model: BpmnModel,
+    private readonly model: BpmnEditor,
     private readonly owner: ModelElement
   ) {}
 
@@ -290,7 +291,7 @@ export class ExtensionElementsBuilder {
 
 export class CustomExtensionElement {
   constructor(
-    private readonly model: BpmnModel,
+    private readonly model: BpmnEditor,
     readonly raw: ModdleElement
   ) {}
 
@@ -324,7 +325,7 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
   readonly extensions: ExtensionElementsBuilder;
 
   constructor(
-    private readonly model: BpmnModel,
+    private readonly model: BpmnEditor,
     readonly raw: TypedModdleElement<Type>
   ) {
     this.extensions = new ExtensionElementsBuilder(model, this);
@@ -345,7 +346,7 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
     return this.raw.$type;
   }
 
-  isOwnedBy(model: BpmnModel): boolean {
+  isOwnedBy(model: BpmnEditor): boolean {
     return this.model === model;
   }
 
@@ -553,7 +554,7 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
   }
 }
 
-export class BpmnModel {
+export class BpmnEditor {
   private readonly ids = new Set<string>();
   private readonly elementsById = new Map<string, ModdleElement>();
   private readonly ownedElements = new Set<ModdleElement>();
@@ -571,7 +572,7 @@ export class BpmnModel {
   static async open(
     file: string,
     options: OpenModelOptions = {}
-  ): Promise<BpmnModel> {
+  ): Promise<BpmnEditor> {
     const source = await readSourceDocument(file);
     const loaderOptions = {
       autoProfile: options.autoProfile ?? true,
@@ -582,12 +583,12 @@ export class BpmnModel {
       loadSemanticModelFromDocument(source, loaderOptions),
       loadSemanticModelFromDocument(source, loaderOptions)
     ]);
-    return new BpmnModel(baseline, editable, source, options, false);
+    return new BpmnEditor(baseline, editable, source, options, false);
   }
 
   static async create(
     options: CreateModelOptions = {}
-  ): Promise<BpmnModel> {
+  ): Promise<BpmnEditor> {
     const profile = options.profile ?? "zeebe";
     const runtimeOptions: ModelRuntimeOptions = {
       autoProfile: options.autoProfile ?? false,
@@ -621,7 +622,7 @@ export class BpmnModel {
       loadSemanticModelFromDocument(source, loaderOptions),
       loadSemanticModelFromDocument(source, loaderOptions)
     ]);
-    return new BpmnModel(
+    return new BpmnEditor(
       baseline,
       editable,
       source,
@@ -721,6 +722,17 @@ export class BpmnModel {
     const element = this.create(type, properties);
     this.append(this.editable.definitions, element, "rootElements");
     return element;
+  }
+
+  composeProcess(processId: string): ProcessComposer {
+    const process = this.element<"bpmn:Process">(processId);
+    if (process.type !== "bpmn:Process") {
+      throw new ModelApiError(
+        "INVALID_PROPERTY",
+        `composeProcess() requires "${processId}" to identify a bpmn:Process`
+      );
+    }
+    return new ProcessComposer(this, process);
   }
 
   append(
@@ -1061,7 +1073,7 @@ export class BpmnModel {
     if (this.isMemoryModel && options.output === undefined) {
       throw new ModelApiError(
         "OUTPUT_REQUIRED",
-        "BpmnModel.create() requires write({ output })"
+        "BpmnEditor.create() requires write({ output })"
       );
     }
 
@@ -1168,5 +1180,20 @@ export class BpmnModel {
     }
 
     return element;
+  }
+}
+
+export class ProcessComposer {
+  constructor(
+    private readonly editor: BpmnEditor,
+    private readonly process: ModelElement<"bpmn:Process">
+  ) {}
+
+  at(nodeId: string): ProcessBuilder {
+    return ProcessBuilder.continue(
+      this.editor,
+      this.process,
+      this.editor.element(nodeId)
+    );
   }
 }

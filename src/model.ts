@@ -38,6 +38,25 @@ export interface FormConfiguration {
   formKey?: string;
 }
 
+export interface CalledDecisionConfiguration {
+  decisionId: string;
+  resultVariable?: string;
+}
+
+export interface CalledElementConfiguration {
+  processId?: string;
+  processIdExpression?: string;
+  propagateAllChildVariables?: boolean;
+  propagateAllParentVariables?: boolean;
+}
+
+export interface MultiInstanceConfiguration {
+  inputCollection?: string;
+  inputElement?: string;
+  outputCollection?: string;
+  outputElement?: string;
+}
+
 export interface IoInput {
   source: string;
   target: string;
@@ -483,6 +502,50 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
         form.raw.set(property, value);
       }
     }
+    return this;
+  }
+
+  configureSubscription(correlationKey: string): this {
+    this.extensions.ensure("zeebe:Subscription").setProperties({ correlationKey });
+    return this;
+  }
+
+  configureCalledDecision(configuration: CalledDecisionConfiguration): this {
+    if (!this.raw.$instanceOf("bpmn:BusinessRuleTask")) {
+      throw new ModelApiError("INVALID_EXTENSION", "Called decisions require bpmn:BusinessRuleTask");
+    }
+    this.extensions.ensure("zeebe:CalledDecision").setProperties(configuration);
+    return this;
+  }
+
+  configureCalledElement(configuration: CalledElementConfiguration): this {
+    if (!this.raw.$instanceOf("bpmn:CallActivity")) {
+      throw new ModelApiError("INVALID_EXTENSION", "Called elements require bpmn:CallActivity");
+    }
+    this.extensions.ensure("zeebe:CalledElement").setProperties(configuration);
+    return this;
+  }
+
+  configureScript(expression: string, resultVariable?: string): this {
+    if (!this.raw.$instanceOf("bpmn:ScriptTask")) {
+      throw new ModelApiError("INVALID_EXTENSION", "Scripts require bpmn:ScriptTask");
+    }
+    this.extensions.ensure("zeebe:Script").setProperties({ expression, resultVariable });
+    return this;
+  }
+
+  configureMultiInstance(configuration: MultiInstanceConfiguration): this {
+    const existing = this.raw.get("loopCharacteristics");
+    const loop = existing instanceof Object && "$type" in existing
+      ? this.model.wrap(
+        existing as TypedModdleElement<"bpmn:MultiInstanceLoopCharacteristics">
+      )
+      : this.createChild(
+        "loopCharacteristics" as ContainedChildProperty<Type>,
+        "bpmn:MultiInstanceLoopCharacteristics",
+        {}
+      );
+    loop.extensions.ensure("zeebe:LoopCharacteristics").setProperties(configuration);
     return this;
   }
 }

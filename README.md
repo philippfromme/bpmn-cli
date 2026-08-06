@@ -1,9 +1,8 @@
-# bpmn-cli
+# bpmn-sdk
 
-`bpmn-cli` is a TypeScript library for creating and safely editing BPMN 2.0
-and Camunda 8 / Zeebe models. Despite its name, it is not a command-line tool:
-applications and generator scripts import the library, build or edit a model,
-then write verified BPMN XML.
+`bpmn-sdk` is a TypeScript library for creating and safely editing BPMN 2.0
+and Camunda 8 / Zeebe models. Applications and generator scripts import the
+library, build or edit a model, then write verified BPMN XML.
 
 `Bpmn` is the single public entry point to one parser, descriptor resolver,
 mutation kernel, layout engine, semantic verifier, and atomic output path.
@@ -12,7 +11,7 @@ Use it for concise generators and exact-ID editing alike.
 ## Install
 
 ```sh
-npm install @philippfromme/bpmn-cli
+npm install @philippfromme/bpmn-sdk
 ```
 
 Requires Node.js 20.12 or later.
@@ -20,7 +19,7 @@ Requires Node.js 20.12 or later.
 ## Generate a process
 
 ```ts
-import { Bpmn } from "@philippfromme/bpmn-cli";
+import { Bpmn } from "@philippfromme/bpmn-sdk";
 
 const process = await Bpmn.createProcess("approval-flow", {
   name: "Approval flow"
@@ -86,7 +85,7 @@ script needs exact-ID edits before writing.
 exact IDs, and typed contained children instead of XML manipulation.
 
 ```ts
-import { Bpmn } from "@philippfromme/bpmn-cli";
+import { Bpmn } from "@philippfromme/bpmn-sdk";
 
 const model = await Bpmn.open("customer-support.bpmn");
 const task = model.element<"bpmn:ServiceTask">("SendReply");
@@ -139,7 +138,7 @@ model.element("Task_1").extensions.ensureCustom("acme:Settings", {
 ## Create an editable model
 
 ```ts
-import { Bpmn } from "@philippfromme/bpmn-cli";
+import { Bpmn } from "@philippfromme/bpmn-sdk";
 
 const model = await Bpmn.create();
 const process = model.process({ name: "Customer email" });

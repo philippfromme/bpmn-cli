@@ -7,7 +7,7 @@ import test from "node:test";
 import { writeNewOutput } from "./output.js";
 
 test("uses exclusive creation when hard links are unavailable", async (context) => {
-  const directory = await mkdtemp(join(tmpdir(), "bpmn-cli-output-"));
+  const directory = await mkdtemp(join(tmpdir(), "bpmn-sdk-output-"));
   const temporary = join(directory, "output.tmp");
   const output = join(directory, "output.json");
   context.after(() => rm(directory, { force: true, recursive: true }));

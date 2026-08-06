@@ -1,15 +1,15 @@
 {
-  "name": "@philippfromme/bpmn-cli",
+  "name": "@philippfromme/bpmn-sdk",
   "version": "0.1.0",
-  "description": "Fluent, type-safe BPMN model construction and safe output writing for TypeScript.",
+  "description": "A fluent, type-safe BPMN SDK for model construction and safe output writing in TypeScript.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/philippfromme/bpmn-cli.git"
+    "url": "git+https://github.com/philippfromme/bpmn-sdk.git"
   },
   "bugs": {
-    "url": "https://github.com/philippfromme/bpmn-cli/issues"
+    "url": "https://github.com/philippfromme/bpmn-sdk/issues"
   },
-  "homepage": "https://github.com/philippfromme/bpmn-cli#readme",
+  "homepage": "https://github.com/philippfromme/bpmn-sdk#readme",
   "publishConfig": {
     "access": "public"
   },

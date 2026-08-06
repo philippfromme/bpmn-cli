@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`bpmn-cli` is a focused TypeScript library for safe, fluent BPMN model changes.
+`bpmn-sdk` is a focused TypeScript library for safe, fluent BPMN model changes.
 Optimize for semantic correctness, deterministic behavior, and low agent
 context cost.
 

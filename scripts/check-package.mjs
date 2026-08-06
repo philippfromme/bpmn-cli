@@ -30,8 +30,8 @@ assert.equal(packed.length, 1);
 assert.equal(typeof packed[0]?.filename, "string");
 
 const archive = join(root, packed[0].filename);
-const consumerRoot = await mkdtemp(join(tmpdir(), "bpmn-cli-package-"));
-const packageRoot = join(consumerRoot, "node_modules", "@philippfromme", "bpmn-cli");
+const consumerRoot = await mkdtemp(join(tmpdir(), "bpmn-sdk-package-"));
+const packageRoot = join(consumerRoot, "node_modules", "@philippfromme", "bpmn-sdk");
 
 try {
   await writeFile(
@@ -70,7 +70,7 @@ try {
   const consumerTypeScript = join(consumerRoot, "consumer.ts");
   await writeFile(
     consumerJavaScript,
-    `import { Bpmn } from "@philippfromme/bpmn-cli";
+    `import { Bpmn } from "@philippfromme/bpmn-sdk";
 if (typeof Bpmn !== "object") throw new Error("Bpmn export missing");
 if (typeof Bpmn.create !== "function" || typeof Bpmn.open !== "function") {
   throw new Error("Bpmn editor entry points missing");
@@ -84,7 +84,7 @@ if (typeof Bpmn.create !== "function" || typeof Bpmn.open !== "function") {
   type BpmnEditor,
   type ElementProperties,
   type WriteOptions
-} from "@philippfromme/bpmn-cli";
+} from "@philippfromme/bpmn-sdk";
 const options: WriteOptions = { layout: "none" };
 const task: ElementProperties<"bpmn:ServiceTask"> = { retryCounter: "3" };
 void options;

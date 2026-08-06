@@ -54,7 +54,7 @@ const zeebeFixture = fileURLToPath(
 async function withTemporaryDirectory(
   run: (directory: string) => Promise<void>
 ): Promise<void> {
-  const directory = await mkdtemp(join(tmpdir(), "bpmn-cli-model-"));
+  const directory = await mkdtemp(join(tmpdir(), "bpmn-sdk-model-"));
 
   try {
     await run(directory);

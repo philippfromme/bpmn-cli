@@ -1,18 +1,18 @@
 ---
-name: bpmn-cli
-description: Create and safely edit BPMN 2.0 and Camunda 8 / Zeebe models with @philippfromme/bpmn-cli.
+name: bpmn-sdk
+description: Create and safely edit BPMN 2.0 and Camunda 8 / Zeebe models with @philippfromme/bpmn-sdk.
 ---
 
-# Model BPMN with bpmn-cli
+# Model BPMN with bpmn-sdk
 
-Use `@philippfromme/bpmn-cli` to create or edit BPMN 2.0 and Zeebe models.
+Use `@philippfromme/bpmn-sdk` to create or edit BPMN 2.0 and Zeebe models.
 This is a reference skill to adapt for an agent host; installing the package
 does not activate this file automatically.
 
 ## Choose an entry point
 
 ```ts
-import { Bpmn } from "@philippfromme/bpmn-cli";
+import { Bpmn } from "@philippfromme/bpmn-sdk";
 
 const process = await Bpmn.createProcess("process-id");
 const collaboration = await Bpmn.createCollaboration("collaboration-id");

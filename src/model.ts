@@ -739,12 +739,12 @@ export class BpmnEditor {
     return element;
   }
 
-  composeProcess(processId: string): ProcessComposer {
+  continueProcess(processId: string): ProcessComposer {
     const process = this.element<"bpmn:Process">(processId);
     if (process.type !== "bpmn:Process") {
       throw new ModelApiError(
         "INVALID_PROPERTY",
-        `composeProcess() requires "${processId}" to identify a bpmn:Process`
+        `continueProcess() requires "${processId}" to identify a bpmn:Process`
       );
     }
     return new ProcessComposer(this, process);

@@ -26,6 +26,8 @@ export {
 } from "./model-runtime.js";
 export {
   BranchBuilder,
+  type BusinessRuleTaskOptions,
+  type CallActivityOptions,
   CollaborationBuilder,
   ProcessBuilder,
   ProcessBuilderError,
@@ -34,6 +36,7 @@ export {
   type ErrorReference,
   type EscalationReference,
   type EventDefinition,
+  type HumanTaskConfiguration,
   type LoopFlowOptions,
   type MessageFlowOptions,
   type MessageOptions,
@@ -44,6 +47,9 @@ export {
   type ProcessOptions,
   type ServiceTaskOptions,
   type SignalReference,
+  type ScriptTaskOptions,
   type StandardLoopOptions,
-  type TimerEventOptions
+  type TaskListenerConfiguration,
+  type TimerEventOptions,
+  type UserTaskOptions,
 } from "./fluent.js";

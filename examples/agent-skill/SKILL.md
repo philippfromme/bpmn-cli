@@ -81,7 +81,7 @@ To continue an existing process fluently, specify both IDs:
 
 ```ts
 await editor
-  .composeProcess("CustomerSupport")
+  .continueProcess("CustomerSupport")
   .at("SendReply")
   .endEvent("ReplySent")
   .write({ output: "completed.bpmn" });
@@ -102,7 +102,12 @@ await editor
 
 - Service work: `serviceTask` with `taskType`, retries, I/O, headers, and
   properties.
-- Human work: `userTask` with `formId`.
+- Human work: `userTask` with `form` and optional `humanTask` assignment,
+  priority, schedule, and listener configuration.
+- Called work: `callActivity` with `calledElement`, `businessRuleTask` with
+  `calledDecision`, or `scriptTask` with `script`.
+- Repeated work: `multiInstanceLoop` with optional Zeebe collection and
+  element mappings.
 - Exception handling: attach typed timer, error, escalation, message, or
   signal boundary handlers.
 - Collaboration: create participants, messages, and message flows with exact

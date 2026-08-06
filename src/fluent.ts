@@ -1,6 +1,9 @@
 import {
   BpmnEditor,
   ModelApiError,
+  type CalledDecisionConfiguration,
+  type CalledElementConfiguration,
+  type FormConfiguration,
   type IoInput,
   type ModelElement
 } from "./model.js";
@@ -50,6 +53,28 @@ export interface ServiceTaskOptions extends NodeOptions {
 
 export interface UserTaskOptions extends NodeOptions {
   formId?: string;
+  form?: FormConfiguration;
+  humanTask?: HumanTaskConfiguration;
+}
+
+export interface HumanTaskConfiguration {
+  assignment?: {
+    assignee?: string;
+    candidateGroups?: string;
+    candidateUsers?: string;
+  };
+  listeners?: readonly TaskListenerConfiguration[];
+  priority?: string;
+  schedule?: {
+    dueDate?: string;
+    followUpDate?: string;
+  };
+}
+
+export interface TaskListenerConfiguration {
+  eventType: string;
+  retries?: string;
+  type: string;
 }
 
 export interface TimerEventOptions extends NodeOptions {
@@ -98,6 +123,27 @@ export interface MultiInstanceLoopOptions {
   cardinality: string;
   completionCondition?: string;
   sequential?: boolean;
+  zeebe?: {
+    inputCollection?: string;
+    inputElement?: string;
+    outputCollection?: string;
+    outputElement?: string;
+  };
+}
+
+export interface CallActivityOptions extends NodeOptions {
+  calledElement?: CalledElementConfiguration;
+}
+
+export interface BusinessRuleTaskOptions extends NodeOptions {
+  calledDecision?: CalledDecisionConfiguration;
+}
+
+export interface ScriptTaskOptions extends NodeOptions {
+  script?: {
+    expression: string;
+    resultVariable?: string;
+  };
 }
 
 export interface AdHocSubProcessOptions extends NodeOptions {
@@ -153,6 +199,7 @@ export class ProcessBuilderError extends Error {
       | "EMPTY_CONDITION"
       | "INVALID_EVENT"
       | "INVALID_LOOP"
+      | "INVALID_TASK_LISTENER"
       | "INVALID_TASK_TYPE"
       | "PROCESS_COMPLETE"
       | "START_EVENT_REQUIRED"
@@ -213,6 +260,46 @@ function configureServiceTask(
     const properties = task.extensions.ensure("zeebe:Properties");
     for (const [name, value] of Object.entries(options.properties)) {
       properties.createChild("properties", "zeebe:Property", { name, value });
+    }
+  }
+}
+
+function configureUserTask(
+  task: ModelElement<"bpmn:UserTask">,
+  options: UserTaskOptions
+): void {
+  const form = options.form ??
+    (options.formId === undefined ? undefined : { formId: options.formId });
+  if (form !== undefined) {
+    task.configureForm(form);
+  }
+
+  const humanTask = options.humanTask;
+  if (humanTask?.assignment !== undefined) {
+    task.extensions.ensure("zeebe:AssignmentDefinition").setProperties(
+      humanTask.assignment
+    );
+  }
+  if (humanTask?.priority !== undefined) {
+    task.extensions.ensure("zeebe:PriorityDefinition").setProperties({
+      priority: humanTask.priority
+    });
+  }
+  if (humanTask?.schedule !== undefined) {
+    task.extensions.ensure("zeebe:TaskSchedule").setProperties(
+      humanTask.schedule
+    );
+  }
+  if (humanTask?.listeners !== undefined) {
+    const listeners = task.extensions.ensure("zeebe:TaskListeners");
+    for (const listener of humanTask.listeners) {
+      if (listener.eventType.trim().length === 0 || listener.type.trim().length === 0) {
+        throw new ProcessBuilderError(
+          "INVALID_TASK_LISTENER",
+          "A Zeebe task listener requires non-empty eventType and type values"
+        );
+      }
+      listeners.createChild("listeners", "zeebe:TaskListener", listener);
     }
   }
 }
@@ -407,6 +494,9 @@ function configureMultiInstanceLoop(
     });
   }
   model.append(activity, loop, "loopCharacteristics");
+  if (options.zeebe !== undefined) {
+    loop.extensions.ensure("zeebe:LoopCharacteristics").setProperties(options.zeebe);
+  }
 }
 
 class BoundaryHandlerBuilder {
@@ -423,9 +513,7 @@ class BoundaryHandlerBuilder {
 
   userTask(id: string, options: UserTaskOptions = {}): this {
     this.add("bpmn:UserTask", id, options);
-    if (options.formId !== undefined) {
-      this.model.element<"bpmn:UserTask">(id).configureForm({ formId: options.formId });
-    }
+    configureUserTask(this.model.element<"bpmn:UserTask">(id), options);
     return this;
   }
 
@@ -516,9 +604,7 @@ export class BranchBuilder {
 
   userTask(id: string, options: UserTaskOptions = {}): this {
     this.addNode("bpmn:UserTask", id, options);
-    if (options.formId !== undefined) {
-      this.model.element<"bpmn:UserTask">(id).configureForm({ formId: options.formId });
-    }
+    configureUserTask(this.model.element<"bpmn:UserTask">(id), options);
     return this;
   }
 
@@ -711,9 +797,7 @@ export class ProcessBuilder {
 
   userTask(id: string, options: UserTaskOptions = {}): this {
     this.addNode("bpmn:UserTask", id, options);
-    if (options.formId !== undefined) {
-      this.model.element<"bpmn:UserTask">(id).configureForm({ formId: options.formId });
-    }
+    configureUserTask(this.model.element<"bpmn:UserTask">(id), options);
     return this;
   }
 
@@ -743,18 +827,31 @@ export class ProcessBuilder {
     return this;
   }
 
-  callActivity(id: string, options: NodeOptions = {}): this {
+  callActivity(id: string, options: CallActivityOptions = {}): this {
     this.addNode("bpmn:CallActivity", id, options);
+    if (options.calledElement !== undefined) {
+      this.model.element<"bpmn:CallActivity">(id).configureCalledElement(options.calledElement);
+    }
     return this;
   }
 
-  businessRuleTask(id: string, options: NodeOptions = {}): this {
+  businessRuleTask(id: string, options: BusinessRuleTaskOptions = {}): this {
     this.addNode("bpmn:BusinessRuleTask", id, options);
+    if (options.calledDecision !== undefined) {
+      this.model.element<"bpmn:BusinessRuleTask">(id)
+        .configureCalledDecision(options.calledDecision);
+    }
     return this;
   }
 
-  scriptTask(id: string, options: NodeOptions = {}): this {
+  scriptTask(id: string, options: ScriptTaskOptions = {}): this {
     this.addNode("bpmn:ScriptTask", id, options);
+    if (options.script !== undefined) {
+      this.model.element<"bpmn:ScriptTask">(id).configureScript(
+        options.script.expression,
+        options.script.resultVariable
+      );
+    }
     return this;
   }
 

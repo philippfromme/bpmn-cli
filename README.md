@@ -96,8 +96,43 @@ flows are never inferred.
 The fluent layer covers common BPMN topology: exclusive, parallel, inclusive,
 and event-based gateways; intermediate and boundary events; timers, messages,
 errors, escalations, signals, and links; loops; subprocesses and ad-hoc
-subprocesses. It also supports common Zeebe service-task configuration:
-task type, retries, inputs/outputs, headers, properties, and forms.
+subprocesses. It also supports common Zeebe service-task, human-task,
+called-process, called-decision, script, and multi-instance configuration.
+
+### Fluent Zeebe configuration
+
+Task options configure the Zeebe extensions associated with their BPMN type:
+
+```ts
+await process
+  .startEvent("start")
+  .userTask("review", {
+    form: { formId: "review-request" },
+    humanTask: {
+      assignment: { candidateGroups: "reviewers" },
+      priority: "=request.priority",
+      schedule: { dueDate: "=request.dueDate" }
+    }
+  })
+  .callActivity("fulfil", {
+    calledElement: { processId: "fulfil-request" }
+  })
+  .businessRuleTask("decide", {
+    calledDecision: { decisionId: "approval", resultVariable: "decision" }
+  })
+  .scriptTask("prepare-response", {
+    script: { expression: "=decision.approved", resultVariable: "approved" }
+  })
+  .multiInstanceLoop({
+    cardinality: "=count(items)",
+    zeebe: { inputCollection: "=items", inputElement: "item" }
+  })
+  .endEvent("done");
+```
+
+`userTask` continues to accept `formId` as a shorthand for
+`form: { formId }`. Use `humanTask.listeners` for user-task lifecycle
+listeners when the listener's event type and job type are known.
 
 ## Generate a collaboration
 
@@ -159,7 +194,7 @@ targets explicitly; no cursor is inferred:
 
 ```ts
 await model
-  .composeProcess("CustomerSupport")
+  .continueProcess("CustomerSupport")
   .at("SendReply")
   .endEvent("ReplySent")
   .write({ output: "customer-support.completed.bpmn" });
@@ -250,9 +285,12 @@ write success, semantic fidelity after reload, and local BPMN/Zeebe
 descriptor compatibility. It does not replace validation against an external
 Camunda runtime.
 
-## Scope and current gaps
+## API scope
 
-The editor returned by `Bpmn.open()` and `Bpmn.create()` covers bundled BPMN, BPMNDI/DC/DI, and Zeebe
-descriptor-backed properties. The fluent API is intentionally curated, not a
-mirror of every descriptor. Current fluent gaps include assignment/lifecycle
-settings, event subprocesses, and multi-instance element/output mappings.
+The exact-ID editor returned by `Bpmn.open()` and `Bpmn.create()` supports
+bundled BPMN, BPMNDI/DC/DI, and Zeebe descriptor-backed properties. The fluent
+API is intentionally curated for common topology and Zeebe task configuration;
+it is not a mirror of every descriptor.
+
+The fluent API does not currently expose event subprocesses, execution
+listeners, linked resources, conditional filters, or modeler-template metadata.

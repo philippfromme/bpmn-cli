@@ -115,7 +115,7 @@ test("continues an exact editor process from an explicit flow node", async () =>
     editor.connect(start, selected);
 
     const continuation = editor
-      .composeProcess("Process_continue")
+      .continueProcess("Process_continue")
       .at("Task_continue")
       .serviceTask("Task_next", { taskType: "continue" })
       .endEvent("End_continue");
@@ -160,32 +160,32 @@ test("rejects invalid process composition targets and preserves terminal and bra
     (error: unknown) => error instanceof ModelApiError && error.code === "FOREIGN_ELEMENT"
   );
   assert.throws(
-    () => editor.composeProcess("missing"),
+    () => editor.continueProcess("missing"),
     (error: unknown) => error instanceof ModelApiError && error.code === "ELEMENT_NOT_FOUND"
   );
   assert.throws(
-    () => editor.composeProcess("Gateway_first"),
+    () => editor.continueProcess("Gateway_first"),
     (error: unknown) => error instanceof ModelApiError && error.code === "INVALID_PROPERTY"
   );
   assert.throws(
-    () => editor.composeProcess("Process_first").at("missing"),
+    () => editor.continueProcess("Process_first").at("missing"),
     (error: unknown) => error instanceof ModelApiError && error.code === "ELEMENT_NOT_FOUND"
   );
   assert.throws(
-    () => editor.composeProcess("Process_first").at(defaultFlow.id),
+    () => editor.continueProcess("Process_first").at(defaultFlow.id),
     (error: unknown) => error instanceof ModelApiError && error.code === "INVALID_CONNECTION"
   );
   assert.throws(
-    () => editor.composeProcess("Process_first").at("Task_second"),
+    () => editor.continueProcess("Process_first").at("Task_second"),
     (error: unknown) => error instanceof ModelApiError && error.code === "INVALID_CONTAINMENT"
   );
   assert.throws(
-    () => editor.composeProcess("Process_first").at("End_terminal").userTask("after-end"),
+    () => editor.continueProcess("Process_first").at("End_terminal").userTask("after-end"),
     (error: unknown) =>
       error instanceof ProcessBuilderError && error.code === "PROCESS_COMPLETE"
   );
   assert.throws(
-    () => editor.composeProcess("Process_first").at("Gateway_first").branch(
+    () => editor.continueProcess("Process_first").at("Gateway_first").branch(
       "another-default",
       (branch) => branch.defaultFlow().endEvent("End_another")
     ),
@@ -334,6 +334,111 @@ test("builds and writes a branched Zeebe process", async () => {
     assert.equal(taskDefinition?.get("retries"), "3");
     assert.match(await readFile(output, "utf8"), /bpmndi:BPMNDiagram/);
   });
+});
+
+test("configures fluent Zeebe task and multi-instance extensions", async () => {
+  const process = await Bpmn.createProcess("Process_zeebe_extensions");
+  const model = process
+    .startEvent("Start_1")
+    .userTask("UserTask_1", {
+      form: {
+        externalReference: "forms/review.form",
+        formId: "review-form",
+        formKey: "=forms.review"
+      },
+      humanTask: {
+        assignment: {
+          assignee: "=reviewer",
+          candidateGroups: "reviewers",
+          candidateUsers: "=backupReviewer"
+        },
+        listeners: [{ eventType: "assigning", retries: "3", type: "audit-user-task" }],
+        priority: "=request.priority",
+        schedule: { dueDate: "=request.dueDate", followUpDate: "=request.followUp" }
+      }
+    })
+    .callActivity("CallActivity_1", {
+      calledElement: {
+        processId: "child-process",
+        propagateAllChildVariables: true,
+        propagateAllParentVariables: false
+      }
+    })
+    .businessRuleTask("BusinessRuleTask_1", {
+      calledDecision: { decisionId: "approval-decision", resultVariable: "decision" }
+    })
+    .scriptTask("ScriptTask_1", {
+      script: { expression: "=decision.result", resultVariable: "approved" }
+    })
+    .multiInstanceLoop({
+      cardinality: "=count(items)",
+      zeebe: {
+        inputCollection: "=items",
+        inputElement: "item",
+        outputCollection: "results",
+        outputElement: "result"
+      }
+    })
+    .endEvent("End_1")
+    .build();
+
+  const extensions = (id: string): ReturnType<typeof moddleElements> => {
+    const extensionElements = model.element(id).raw.get("extensionElements");
+    assert.ok(isModdleElement(extensionElements), `${id} should have extension elements`);
+    return moddleElements(extensionElements.get("values"));
+  };
+  const extension = (id: string, type: string) => {
+    const element = extensions(id).find((candidate) => candidate.$type === type);
+    assert.ok(isModdleElement(element), `${id} should contain ${type}`);
+    return element;
+  };
+
+  assert.equal(extension("UserTask_1", "zeebe:FormDefinition").get("formId"), "review-form");
+  assert.equal(
+    extension("UserTask_1", "zeebe:AssignmentDefinition").get("assignee"),
+    "=reviewer"
+  );
+  assert.equal(
+    extension("UserTask_1", "zeebe:PriorityDefinition").get("priority"),
+    "=request.priority"
+  );
+  assert.equal(extension("UserTask_1", "zeebe:TaskSchedule").get("dueDate"), "=request.dueDate");
+  const taskListeners = extension("UserTask_1", "zeebe:TaskListeners");
+  assert.equal(
+    moddleElements(taskListeners.get("listeners"))[0]?.get("eventType"),
+    "assigning"
+  );
+  assert.equal(
+    extension("CallActivity_1", "zeebe:CalledElement").get("processId"),
+    "child-process"
+  );
+  assert.equal(
+    extension("BusinessRuleTask_1", "zeebe:CalledDecision").get("decisionId"),
+    "approval-decision"
+  );
+  assert.equal(
+    extension("ScriptTask_1", "zeebe:Script").get("expression"),
+    "=decision.result"
+  );
+  const loop = model.element("ScriptTask_1").child<"bpmn:MultiInstanceLoopCharacteristics">(
+    "loopCharacteristics"
+  );
+  const loopExtensionElements = loop.raw.get("extensionElements");
+  assert.ok(isModdleElement(loopExtensionElements));
+  const loopExtension = moddleElements(loopExtensionElements.get("values"))
+    .find((element) => element.$type === "zeebe:LoopCharacteristics");
+  assert.ok(isModdleElement(loopExtension));
+  assert.equal(loopExtension.get("inputCollection"), "=items");
+  assert.equal(loopExtension.get("outputElement"), "result");
+
+  const invalid = await Bpmn.createProcess("Process_invalid_listener");
+  assert.throws(
+    () => invalid.startEvent("Start_invalid").userTask("UserTask_invalid", {
+      humanTask: { listeners: [{ eventType: "", type: "audit-user-task" }] }
+    }),
+    (error: unknown) =>
+      error instanceof ProcessBuilderError && error.code === "INVALID_TASK_LISTENER"
+  );
 });
 
 test("rejects incomplete and ambiguous branch declarations", async () => {

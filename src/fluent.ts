@@ -27,9 +27,17 @@ export interface UserTaskOptions extends NodeOptions {
 }
 
 type FlowNodeType =
+  | "bpmn:BusinessRuleTask"
+  | "bpmn:CallActivity"
   | "bpmn:EndEvent"
+  | "bpmn:EventBasedGateway"
   | "bpmn:ExclusiveGateway"
+  | "bpmn:InclusiveGateway"
+  | "bpmn:IntermediateCatchEvent"
+  | "bpmn:IntermediateThrowEvent"
   | "bpmn:ParallelGateway"
+  | "bpmn:ScriptTask"
+  | "bpmn:SubProcess"
   | "bpmn:ServiceTask"
   | "bpmn:StartEvent"
   | "bpmn:UserTask";
@@ -270,6 +278,38 @@ export class ProcessBuilder {
 
   parallelGateway(id: string, options: NodeOptions = {}): this {
     return this.addNode("bpmn:ParallelGateway", id, options);
+  }
+
+  inclusiveGateway(id: string, options: NodeOptions = {}): this {
+    return this.addNode("bpmn:InclusiveGateway", id, options);
+  }
+
+  eventBasedGateway(id: string, options: NodeOptions = {}): this {
+    return this.addNode("bpmn:EventBasedGateway", id, options);
+  }
+
+  callActivity(id: string, options: NodeOptions = {}): this {
+    return this.addNode("bpmn:CallActivity", id, options);
+  }
+
+  businessRuleTask(id: string, options: NodeOptions = {}): this {
+    return this.addNode("bpmn:BusinessRuleTask", id, options);
+  }
+
+  scriptTask(id: string, options: NodeOptions = {}): this {
+    return this.addNode("bpmn:ScriptTask", id, options);
+  }
+
+  subProcess(id: string, options: NodeOptions = {}): this {
+    return this.addNode("bpmn:SubProcess", id, options);
+  }
+
+  intermediateCatchEvent(id: string, options: NodeOptions = {}): this {
+    return this.addNode("bpmn:IntermediateCatchEvent", id, options);
+  }
+
+  intermediateThrowEvent(id: string, options: NodeOptions = {}): this {
+    return this.addNode("bpmn:IntermediateThrowEvent", id, options);
   }
 
   endEvent(id: string, options: NodeOptions = {}): this {

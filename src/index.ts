@@ -19,9 +19,9 @@ export {
   type TypedModdleElement
 } from "./model-types.js";
 export {
-  ModelPublicationError,
-  type PublicationResult,
-  type PublishOptions
+  ModelWriteError,
+  type WriteResult,
+  type WriteOptions
 } from "./model-runtime.js";
 export {
   Bpmn,

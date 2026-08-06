@@ -1,7 +1,7 @@
 {
   "name": "@philippfromme/bpmn-cli",
   "version": "0.1.0",
-  "description": "Fluent, type-safe BPMN model construction and safe publication for TypeScript.",
+  "description": "Fluent, type-safe BPMN model construction and safe output writing for TypeScript.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/philippfromme/bpmn-cli.git"

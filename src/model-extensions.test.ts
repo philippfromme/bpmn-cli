@@ -141,7 +141,7 @@ test("validates descriptor-backed custom extension construction and nested conta
     );
 
     const output = join(directory, "output.bpmn");
-    await model.publish({ layout: "none", output });
+    await model.write({ layout: "none", output });
     const xml = await readFile(output, "utf8");
     assert.match(xml, /acme:Settings priority="high"/);
     assert.match(xml, /acme:Rule name="one"/);

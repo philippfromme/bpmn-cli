@@ -79,9 +79,9 @@ if (typeof BpmnModel !== "function") throw new Error("BpmnModel export missing")
     `import {
   BpmnModel,
   type ElementProperties,
-  type PublishOptions
+  type WriteOptions
 } from "@philippfromme/bpmn-cli";
-const options: PublishOptions = { layout: "none" };
+const options: WriteOptions = { layout: "none" };
 const task: ElementProperties<"bpmn:ServiceTask"> = { retryCounter: "3" };
 void options;
 void task;

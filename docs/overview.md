@@ -2,7 +2,7 @@
 
 `bpmn-cli` is a TypeScript library for working with BPMN business semantics.
 BPMN XML remains the durable artifact, while the fluent API owns safe moddle
-construction and publication.
+construction and output writing.
 
 ## Generate a collaboration
 
@@ -28,7 +28,7 @@ await collaboration
     targetId: "seller",
     messageId: "order-request"
   })
-  .publish({ output: "order-collaboration.bpmn", layout: "none" });
+  .write({ output: "order-collaboration.bpmn", layout: "none" });
 ```
 
 ## Generate a process
@@ -55,13 +55,13 @@ await process
       .endEvent("done")
   )
   .branch("no", (branch) => branch.defaultFlow().endEvent("rejected"))
-  .publish({ output: "approval-flow.bpmn" });
+  .write({ output: "approval-flow.bpmn" });
 ```
 
 Exclusive and inclusive branches must begin with `condition(expression)` or
 `defaultFlow()` and end with `endEvent()` or `join()`. `build()` returns the
 underlying `BpmnModel` when a script needs the lower-level exact-ID API before
-publication. `publish()` retains the standard validation, deterministic
+writing. `write()` retains the standard validation, deterministic
 auto-layout, semantic verification, and atomic-output behavior.
 
 ## Branch joins, events, and loops
@@ -107,10 +107,10 @@ npm run build
 node examples/multi-instance-work.mjs bulk-dispatch.bpmn
 ```
 
-Each script accepts an optional output path and writes its `PublicationResult`
+Each script accepts an optional output path and writes its `WriteResult`
 as JSON. `npm run test:generators` runs all five scripts and enforces a
 2,500-byte script-size ceiling, a 5,000 ms execution ceiling per script,
-successful publication, semantic-hash round trips plus scenario assertions,
+successful write, semantic-hash round trips plus scenario assertions,
 and the local BPMN/Zeebe moddle compatibility gate. The gate rejects parse
 warnings, unresolved references, and unsupported extension data. It validates
 serialized BPMN and Zeebe metadata rather than workflow execution.
@@ -134,14 +134,14 @@ task.extensions.ensure("zeebe:IoMapping").addInput({
   target: "customerId"
 });
 
-const result = await model.publish({
+const result = await model.write({
   output: "customer-support.edited.bpmn",
   layout: "auto",
   validate: true
 });
 ```
 
-`element(id)` requires an exact BPMN ID. `publish` serializes the model,
+`element(id)` requires an exact BPMN ID. `write` serializes the model,
 optionally replaces Diagram Interchange with deterministic layout, reloads it
 with the active profiles, verifies semantic equivalence, reports changes, and
 atomically writes the output. It never needs JSON Pointer paths, request files,
@@ -155,7 +155,7 @@ const process = model.process({ name: "Customer email" });
 const task = model.create("bpmn:UserTask", { name: "Send customer email" });
 model.append(process, task, "flowElements");
 task.configureForm({ formId: "customer-email" });
-await model.publish({ output: "customer-email.bpmn", layout: "auto" });
+await model.write({ output: "customer-email.bpmn", layout: "auto" });
 ```
 
 `connect`, `rewire`, and `remove` maintain or validate SequenceFlow reciprocal
@@ -181,5 +181,5 @@ const settings = model.element("Task_1").extensions.ensureCustom(
 settings.append("rules", "acme:Rule", { name: "customer" });
 ```
 
-Publication refuses malformed or unregistered extension data rather than
+Writing refuses malformed or unregistered extension data rather than
 silently discarding it.

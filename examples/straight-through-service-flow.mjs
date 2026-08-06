@@ -5,7 +5,7 @@ const processBuilder = await Bpmn.createProcess("Process_order_fulfilment", {
   name: "Order fulfilment"
 });
 
-const publication = await processBuilder
+const result = await processBuilder
   .startEvent("Start_order_received", { name: "Order received" })
   .serviceTask("Task_validate_order", {
     name: "Validate order",
@@ -21,6 +21,6 @@ const publication = await processBuilder
     inputs: [{ source: "=validatedOrder", target: "order" }]
   })
   .endEvent("End_order_fulfilled", { name: "Order fulfilled" })
-  .publish({ output });
+  .write({ output });
 
-console.log(JSON.stringify(publication));
+console.log(JSON.stringify(result));

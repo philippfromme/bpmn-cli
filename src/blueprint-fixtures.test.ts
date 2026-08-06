@@ -48,7 +48,7 @@ test("round-trips BPMN and Zeebe semantics from every blueprint fixture", async 
       });
       const output = join(directory, `roundtrip-${basename(source)}`);
       const model = await BpmnModel.open(source);
-      const publication = await model.publish({ layout: "none", output });
+      const result = await model.write({ layout: "none", output });
       const roundTripped = await loadSemanticModel({
         autoProfile: true,
         extensions: [],
@@ -56,9 +56,9 @@ test("round-trips BPMN and Zeebe semantics from every blueprint fixture", async 
       });
 
       assert.equal(
-        publication.semanticHash,
+        result.semanticHash,
         original.semanticHash,
-        `${fixture} publication must preserve semantics`
+        `${fixture} write result must preserve semantics`
       );
       assert.equal(
         roundTripped.semanticHash,
@@ -86,7 +86,7 @@ test("edits nested Zeebe properties in a representative blueprint fixture", asyn
     assert.ok(definition, "fixture task must have a Zeebe task definition");
     task.setName("Send customer reply");
     definition.setProperties({ retries: "5" });
-    await model.publish({ layout: "none", output });
+    await model.write({ layout: "none", output });
 
     const reopened = await BpmnModel.open(output);
     const editedTask = reopened.element<"bpmn:ServiceTask">(

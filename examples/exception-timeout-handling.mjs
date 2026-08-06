@@ -5,7 +5,7 @@ const processBuilder = await Bpmn.createProcess("Process_payment", {
   name: "Payment processing"
 });
 
-const publication = await processBuilder
+const result = await processBuilder
   .startEvent("Start_payment_requested", { name: "Payment requested" })
   .serviceTask("Task_charge_card", {
     name: "Charge card",
@@ -32,6 +32,6 @@ const publication = await processBuilder
     { name: "Payment failed" }
   )
   .endEvent("End_payment_completed", { name: "Payment completed" })
-  .publish({ output, layout: "none" });
+  .write({ output, layout: "none" });
 
-console.log(JSON.stringify(publication));
+console.log(JSON.stringify(result));

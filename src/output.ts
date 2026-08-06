@@ -26,7 +26,7 @@ function isHardLinkUnsupported(error: unknown): boolean {
   );
 }
 
-export async function publishNewOutput(
+export async function writeNewOutput(
   temporary: string,
   resolved: string,
   contents: string,
@@ -118,7 +118,7 @@ export async function writeOutputFile(
     if (force) {
       await rename(temporary, resolved);
     } else {
-      await publishNewOutput(temporary, resolved, contents);
+      await writeNewOutput(temporary, resolved, contents);
     }
   } finally {
     await rm(temporary, { force: true });

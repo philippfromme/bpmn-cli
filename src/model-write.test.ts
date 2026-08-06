@@ -3,11 +3,11 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
-import { BpmnModel, ModelPublicationError } from "./index.js";
+import { BpmnModel, ModelWriteError } from "./index.js";
 import { withTemporaryDirectory, writeBpmn } from "./test-support.test.js";
 
-test("reports added and changed semantic elements after verified publication", async () => {
-  await withTemporaryDirectory("bpmn-publication-changes", async (directory) => {
+test("reports added and changed semantic elements after verified write", async () => {
+  await withTemporaryDirectory("bpmn-write-changes", async (directory) => {
     const source = await writeBpmn(
       directory,
       "source.bpmn",
@@ -20,9 +20,9 @@ test("reports added and changed semantic elements after verified publication", a
     const added = model.create("bpmn:EndEvent", {});
     model.append(process, added, "flowElements");
 
-    const publication = await model.publish({ layout: "none", output });
-    const addedChanges = publication.changes.added;
-    const changedChanges = publication.changes.changed;
+    const result = await model.write({ layout: "none", output });
+    const addedChanges = result.changes.added;
+    const changedChanges = result.changes.changed;
 
     assert.ok(Array.isArray(addedChanges));
     assert.ok(Array.isArray(changedChanges));
@@ -30,17 +30,17 @@ test("reports added and changed semantic elements after verified publication", a
     assert.match(JSON.stringify(addedChanges), /EndEvent_1/);
     assert.match(JSON.stringify(changedChanges), /Task_1/);
     assert.match(JSON.stringify(changedChanges), /Process_1/);
-    assert.equal(publication.destination, output);
-    assert.equal(publication.layout, "none");
-    assert.equal(publication.status, "written");
-    assert.match(publication.outputSha256, /^[a-f0-9]{64}$/);
-    assert.match(publication.semanticHash, /^[a-f0-9]{64}$/);
+    assert.equal(result.destination, output);
+    assert.equal(result.layout, "none");
+    assert.equal(result.status, "written");
+    assert.match(result.outputSha256, /^[a-f0-9]{64}$/);
+    assert.match(result.semanticHash, /^[a-f0-9]{64}$/);
     assert.equal((await BpmnModel.open(output)).element(added.id).type, "bpmn:EndEvent");
   });
 });
 
 test("replaces an opened source only when no output is requested", async () => {
-  await withTemporaryDirectory("bpmn-publication-replace", async (directory) => {
+  await withTemporaryDirectory("bpmn-write-replace", async (directory) => {
     const source = await writeBpmn(
       directory,
       "source.bpmn",
@@ -49,14 +49,14 @@ test("replaces an opened source only when no output is requested", async () => {
     const model = await BpmnModel.open(source);
     model.element("Task_1").setName("After");
 
-    const publication = await model.publish({ layout: "none", validate: false });
-    assert.equal(publication.destination, source);
+    const result = await model.write({ layout: "none", validate: false });
+    assert.equal(result.destination, source);
     assert.match(await readFile(source, "utf8"), /name="After"/);
   });
 });
 
 test("protects existing outputs, permits explicit replacement, and rejects source aliases", async () => {
-  await withTemporaryDirectory("bpmn-publication-output", async (directory) => {
+  await withTemporaryDirectory("bpmn-write-output", async (directory) => {
     const source = await writeBpmn(
       directory,
       "source.bpmn",
@@ -67,26 +67,26 @@ test("protects existing outputs, permits explicit replacement, and rejects sourc
     const model = await BpmnModel.open(source);
 
     await assert.rejects(
-      model.publish({ layout: "none", output }),
+      model.write({ layout: "none", output }),
       (error: unknown) =>
-        error instanceof ModelPublicationError && error.code === "OUTPUT_WRITE_FAILED"
+        error instanceof ModelWriteError && error.code === "OUTPUT_WRITE_FAILED"
     );
     assert.equal(await readFile(output, "utf8"), "existing");
 
-    await model.publish({ force: true, layout: "none", output });
+    await model.write({ force: true, layout: "none", output });
     assert.match(await readFile(output, "utf8"), /bpmn:definitions/);
 
     await assert.rejects(
-      model.publish({ force: true, layout: "none", output: source }),
+      model.write({ force: true, layout: "none", output: source }),
       (error: unknown) =>
-        error instanceof ModelPublicationError && error.code === "OUTPUT_WRITE_FAILED"
+        error instanceof ModelWriteError && error.code === "OUTPUT_WRITE_FAILED"
     );
     assert.match(await readFile(source, "utf8"), /bpmn:definitions/);
   });
 });
 
 test("produces deterministic results for equivalent model programs", async () => {
-  await withTemporaryDirectory("bpmn-publication-determinism", async (directory) => {
+  await withTemporaryDirectory("bpmn-write-determinism", async (directory) => {
     const firstOutput = join(directory, "first.bpmn");
     const secondOutput = join(directory, "second.bpmn");
     const first = await BpmnModel.create();
@@ -105,8 +105,8 @@ test("produces deterministic results for equivalent model programs", async () =>
     }
 
     const [firstResult, secondResult] = await Promise.all([
-      first.publish({ layout: "auto", output: firstOutput }),
-      second.publish({ layout: "auto", output: secondOutput })
+      first.write({ layout: "auto", output: firstOutput }),
+      second.write({ layout: "auto", output: secondOutput })
     ]);
 
     assert.equal(firstResult.outputSha256, secondResult.outputSha256);

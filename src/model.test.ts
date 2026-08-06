@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { BpmnModel, ModelApiError } from "./index.js";
 import { ModelLoadError } from "./model-loader.js";
 import type { ModelElement } from "./model.js";
-import { ModelPublicationError } from "./model-runtime.js";
+import { ModelWriteError } from "./model-runtime.js";
 import { loadSemanticModel } from "./model-loader.js";
 import { expectModelError } from "./test-support.test.js";
 import {
@@ -63,7 +63,7 @@ async function withTemporaryDirectory(
   }
 }
 
-test("creates and publishes a customer-email model with native form and Zeebe I/O", async () => {
+test("creates and writes a customer-email model with native form and Zeebe I/O", async () => {
   await withTemporaryDirectory(async (directory) => {
     const output = join(directory, "customer-email.bpmn");
     const model = await BpmnModel.create();
@@ -76,14 +76,14 @@ test("creates and publishes a customer-email model with native form and Zeebe I/
       target: "email"
     });
 
-    const publication = await model.publish({
+    const result = await model.write({
       layout: "none",
       output,
       validate: true
     });
     const xml = await readFile(output, "utf8");
 
-    assert.equal(publication.status, "written");
+    assert.equal(result.status, "written");
     assert.match(xml, /zeebe:formDefinition formId="customer-email"/);
     assert.match(
       xml,
@@ -93,7 +93,7 @@ test("creates and publishes a customer-email model with native form and Zeebe I/
   });
 });
 
-test("uses deterministic layout by default during publication", async () => {
+test("uses deterministic layout by default during write", async () => {
   await withTemporaryDirectory(async (directory) => {
     const output = join(directory, "laid-out.bpmn");
     const model = await BpmnModel.create();
@@ -107,7 +107,7 @@ test("uses deterministic layout by default during publication", async () => {
     model.connect(start, task);
     model.connect(task, end);
 
-    await model.publish({ output });
+    await model.write({ output });
 
     assert.match(await readFile(output, "utf8"), /bpmndi:BPMNDiagram/);
   });
@@ -134,7 +134,7 @@ test("adds nested Zeebe I/O mappings to an existing task without replacing exten
       source: "xyz",
       target: "customerId"
     });
-    await model.publish({ layout: "none", output, validate: true });
+    await model.write({ layout: "none", output, validate: true });
 
     const xml = await readFile(output, "utf8");
     assert.match(xml, /zeebe:ioMapping/);
@@ -182,7 +182,7 @@ test("attaches and reattaches boundary events through a dedicated operation", as
     assert.deepEqual(firstTask.raw.get("boundaryEventRefs"), []);
     assert.deepEqual(secondTask.raw.get("boundaryEventRefs"), [boundary.raw]);
 
-    await model.publish({ layout: "none", output, validate: true });
+    await model.write({ layout: "none", output, validate: true });
     const reopened = await BpmnModel.open(output);
     assert.equal(
       reopened.element(boundary.id).raw.get("attachedToRef"),
@@ -377,7 +377,7 @@ test("rejects ambiguous lookup and in-use element removal", async () => {
   );
 });
 
-test("publishes loaded custom extension descriptors without JSON Pointer mutation", async () => {
+test("writes loaded custom extension descriptors without JSON Pointer mutation", async () => {
   await withTemporaryDirectory(async (directory) => {
     const descriptor = join(directory, "acme.json");
     const source = join(directory, "source.bpmn");
@@ -424,7 +424,7 @@ test("publishes loaded custom extension descriptors without JSON Pointer mutatio
       { priority: "high" }
     );
     settings.append("rules", "acme:Rule", { name: "customer" });
-    await model.publish({ layout: "none", output, validate: true });
+    await model.write({ layout: "none", output, validate: true });
 
     const xml = await readFile(output, "utf8");
     assert.match(xml, /acme:Settings priority="high"/);
@@ -432,7 +432,7 @@ test("publishes loaded custom extension descriptors without JSON Pointer mutatio
   });
 });
 
-test("refuses publication when extension data has no loaded descriptor", async () => {
+test("refuses write when extension data has no loaded descriptor", async () => {
   await withTemporaryDirectory(async (directory) => {
     const source = join(directory, "unsupported.bpmn");
     const output = join(directory, "edited.bpmn");
@@ -451,9 +451,9 @@ test("refuses publication when extension data has no loaded descriptor", async (
 
     const model = await BpmnModel.open(source);
     await assert.rejects(
-      model.publish({ layout: "none", output }),
+      model.write({ layout: "none", output }),
       (error: unknown) =>
-        error instanceof ModelPublicationError &&
+        error instanceof ModelWriteError &&
         error.code === "UNSUPPORTED_EXTENSION_DATA"
     );
   });
@@ -480,7 +480,7 @@ test("rejects malformed extension XML while opening a model", async () => {
   });
 });
 
-test("preserves existing output when atomic publication rejects replacement", async () => {
+test("preserves existing output when atomic write rejects replacement", async () => {
   await withTemporaryDirectory(async (directory) => {
     const output = join(directory, "existing.bpmn");
     await writeFile(output, "unchanged", "utf8");
@@ -488,9 +488,9 @@ test("preserves existing output when atomic publication rejects replacement", as
     model.process();
 
     await assert.rejects(
-      model.publish({ layout: "none", output }),
+      model.write({ layout: "none", output }),
       (error: unknown) =>
-        error instanceof ModelPublicationError &&
+        error instanceof ModelWriteError &&
         error.code === "OUTPUT_WRITE_FAILED"
     );
     assert.equal(await readFile(output, "utf8"), "unchanged");
@@ -506,14 +506,14 @@ test("preserves semantic hashes when replacing only DI", async () => {
       file: zeebeFixture
     });
     const model = await BpmnModel.open(zeebeFixture);
-    const publication = await model.publish({ layout: "none", output });
+    const result = await model.write({ layout: "none", output });
     const after = await loadSemanticModel({
       autoProfile: true,
       extensions: [],
       file: output
     });
 
-    assert.equal(publication.semanticHash, before.semanticHash);
+    assert.equal(result.semanticHash, before.semanticHash);
     assert.equal(after.semanticHash, before.semanticHash);
   });
 });

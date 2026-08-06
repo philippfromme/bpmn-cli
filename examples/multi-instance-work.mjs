@@ -5,7 +5,7 @@ const processBuilder = await Bpmn.createProcess("Process_bulk_dispatch", {
   name: "Bulk dispatch"
 });
 
-const publication = await processBuilder
+const result = await processBuilder
   .startEvent("Start_dispatch_requested", { name: "Dispatch requested" })
   .serviceTask("Task_dispatch_item", {
     name: "Dispatch item",
@@ -18,6 +18,6 @@ const publication = await processBuilder
     sequential: false
   })
   .endEvent("End_dispatch_completed", { name: "Dispatch completed" })
-  .publish({ output });
+  .write({ output });
 
-console.log(JSON.stringify(publication));
+console.log(JSON.stringify(result));

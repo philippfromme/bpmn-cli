@@ -30,12 +30,12 @@ test("creates models with configured definitions and collision-safe identifiers"
   );
 });
 
-test("requires an explicit destination when publishing an in-memory model", async () => {
+test("requires an explicit destination when writing an in-memory model", async () => {
   const model = await BpmnModel.create();
   model.process();
 
   await assert.rejects(
-    model.publish(),
+    model.write(),
     (error: unknown) =>
       error instanceof ModelApiError && error.code === "OUTPUT_REQUIRED"
   );
@@ -104,14 +104,14 @@ test("rejects invalid or ambiguous containment without changing either parent", 
   assert.equal(task.raw.$parent, first.raw);
 });
 
-test("preserves explicit target namespace through publication", async () => {
+test("preserves explicit target namespace through write", async () => {
   await withTemporaryDirectory("bpmn-target-namespace", async (directory) => {
     const output = join(directory, "model.bpmn");
     const model = await BpmnModel.create({
       targetNamespace: "https://acme.test/processes"
     });
     model.process();
-    await model.publish({ layout: "none", output });
+    await model.write({ layout: "none", output });
 
     assert.match(
       await readFile(output, "utf8"),

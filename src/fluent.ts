@@ -5,8 +5,8 @@ import {
   type ModelElement
 } from "./model.js";
 import type {
-  PublicationResult,
-  PublishOptions
+  WriteResult,
+  WriteOptions
 } from "./model-runtime.js";
 
 export interface ProcessOptions {
@@ -989,8 +989,8 @@ export class ProcessBuilder {
     return this.model;
   }
 
-  publish(options: PublishOptions): Promise<PublicationResult> {
-    return this.build().publish(options);
+  write(options: WriteOptions): Promise<WriteResult> {
+    return this.build().write(options);
   }
 
   private startWithEvent(id: string, definition: EventDefinition, options: NodeOptions): this {
@@ -1101,8 +1101,8 @@ export class CollaborationBuilder {
     return this.model;
   }
 
-  publish(options: PublishOptions): Promise<PublicationResult> {
-    return this.build().publish(options);
+  write(options: WriteOptions): Promise<WriteResult> {
+    return this.build().write(options);
   }
 }
 

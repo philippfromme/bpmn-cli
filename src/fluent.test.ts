@@ -10,7 +10,7 @@ import {
   withTemporaryDirectory
 } from "./test-support.test.js";
 
-test("builds, publishes, and reloads a collaboration with exact ID references", async () => {
+test("builds, writes, and reloads a collaboration with exact ID references", async () => {
   await withTemporaryDirectory("bpmn-collaboration-builder", async (directory) => {
     const output = join(directory, "order-collaboration.bpmn");
     const collaboration = await Bpmn.createCollaboration("Collaboration_order", {
@@ -36,12 +36,12 @@ test("builds, publishes, and reloads a collaboration with exact ID references", 
       })
       .build();
 
-    const publication = await collaboration.publish({ layout: "none", output });
+    const result = await collaboration.write({ layout: "none", output });
     const buyer = model.element<"bpmn:Participant">("Participant_buyer");
     const flow = model.element<"bpmn:MessageFlow">("MessageFlow_order");
     const reopened = await BpmnModel.open(output);
 
-    assert.equal(publication.status, "written");
+    assert.equal(result.status, "written");
     assert.equal(model.element("Collaboration_order").name, "Order collaboration");
     assert.equal(buyer.raw.get("processRef"), model.element("Process_buyer").raw);
     assert.equal(flow.raw.get("sourceRef"), buyer.raw);
@@ -141,7 +141,7 @@ test("rejects missing and mistyped collaboration reference IDs before mutation",
   );
 });
 
-test("builds and publishes a branched Zeebe process", async () => {
+test("builds and writes a branched Zeebe process", async () => {
   await withTemporaryDirectory("bpmn-process-builder", async (directory) => {
     const output = join(directory, "approval-flow.bpmn");
     const process = await Bpmn.createProcess("approval-flow", {
@@ -171,7 +171,7 @@ test("builds and publishes a branched Zeebe process", async () => {
       )
       .build();
 
-    const publication = await process.publish({ output });
+    const result = await process.write({ output });
     const gateway = model.element<"bpmn:ExclusiveGateway">("gw");
     const defaultFlow = gateway.raw.get("default");
     const yesFlow = moddleElements(gateway.raw.get("outgoing")).find(
@@ -186,7 +186,7 @@ test("builds and publishes a branched Zeebe process", async () => {
       (element) => element.$type === "zeebe:TaskDefinition"
     );
 
-    assert.equal(publication.status, "written");
+    assert.equal(result.status, "written");
     assert.equal(model.element("approval-flow").name, "Approval flow");
     assert.equal(model.element("approval-flow").raw.get("isExecutable"), true);
     assert.equal(yesFlow?.get("sourceRef"), gateway.raw);
@@ -366,9 +366,9 @@ test("creates typed timer, message, error, escalation, signal, and link event de
   assert.equal(model.element("Error_problem").raw.get("errorCode"), "PROBLEM");
   assert.equal(model.element("Escalation_manual").raw.get("escalationCode"), "MANUAL");
   await withTemporaryDirectory("bpmn-fluent-events", async (directory) => {
-    const publication = await model.publish({ output: join(directory, "events.bpmn") });
+    const result = await model.write({ output: join(directory, "events.bpmn") });
 
-    assert.equal(publication.status, "written");
+    assert.equal(result.status, "written");
   });
 });
 

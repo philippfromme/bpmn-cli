@@ -25,7 +25,7 @@ test("reports unresolved references without leaking moddle internals", () => {
   assert.doesNotMatch(JSON.stringify(projected.value), /\$descriptor|\$model|\$parent/);
 });
 
-test("preserves unknown attributes in projection but marks them unsafe to publish", () => {
+test("preserves unknown attributes in projection but marks them unsafe to write", () => {
   const moddle = new BpmnModdle();
   const task = moddle.create("bpmn:Task", {
     "acme:priority": "high",

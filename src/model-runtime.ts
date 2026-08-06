@@ -17,14 +17,14 @@ export interface ModelRuntimeOptions {
   profile?: "zeebe";
 }
 
-export interface PublishOptions {
+export interface WriteOptions {
   force?: boolean;
   layout?: "auto" | "none";
   output?: string;
   validate?: boolean;
 }
 
-export interface PublicationResult {
+export interface WriteResult {
   changes: JsonObject;
   destination?: string;
   layout: "auto" | "none";
@@ -33,7 +33,7 @@ export interface PublicationResult {
   status: "verified" | "written";
 }
 
-export class ModelPublicationError extends Error {
+export class ModelWriteError extends Error {
   constructor(
     readonly code:
       | "LAYOUT_FAILED"
@@ -103,7 +103,7 @@ function assertNoIntroducedParseDiagnostics(
   );
 
   if (introduced.length > 0) {
-    throw new ModelPublicationError(
+    throw new ModelWriteError(
       "MODEL_VERIFICATION_FAILED",
       "Serialization or layout introduced unresolved references or BPMN parse warnings"
     );
@@ -116,14 +116,14 @@ function assertSupportedExtensionData(model: SemanticModel): void {
   );
 
   if (unsupported !== undefined) {
-    throw new ModelPublicationError(
+    throw new ModelWriteError(
       "UNSUPPORTED_EXTENSION_DATA",
-      `${unsupported.message}; load its moddle descriptor before publishing`
+      `${unsupported.message}; load its moddle descriptor before writing`
     );
   }
 }
 
-function publicationChanges(
+function writeChanges(
   before: SemanticModel,
   after: SemanticModel
 ): JsonObject {
@@ -170,7 +170,7 @@ export async function serializeAndVerifyModel(
   editable: SemanticModel,
   source: SourceDocument,
   runtimeOptions: ModelRuntimeOptions,
-  options: PublishOptions = {}
+  options: WriteOptions = {}
 ): Promise<{ model: SemanticModel; xml: string }> {
   const layout = options.layout ?? "auto";
   assertSupportedExtensionData(before);
@@ -187,7 +187,7 @@ export async function serializeAndVerifyModel(
       laidOutXml = await layoutProcess(xml);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      throw new ModelPublicationError(
+      throw new ModelWriteError(
         error instanceof Error && error.name === "LayoutError"
           ? "LAYOUT_UNSUPPORTED"
           : "LAYOUT_FAILED",
@@ -221,7 +221,7 @@ export async function serializeAndVerifyModel(
   );
 
   if (reloaded.semanticHash !== expectedSemanticHash) {
-    throw new ModelPublicationError(
+    throw new ModelWriteError(
       "MODEL_VERIFICATION_FAILED",
       "Serialization or layout changed the intended BPMN business semantics"
     );
@@ -234,13 +234,13 @@ export async function serializeAndVerifyModel(
   return { model: reloaded, xml };
 }
 
-export async function publishModel(
+export async function writeModel(
   before: SemanticModel,
   editable: SemanticModel,
   source: SourceDocument,
   runtimeOptions: ModelRuntimeOptions,
-  options: PublishOptions = {}
-): Promise<PublicationResult> {
+  options: WriteOptions = {}
+): Promise<WriteResult> {
   const verified = await serializeAndVerifyModel(
     before,
     editable,
@@ -254,7 +254,7 @@ export async function publishModel(
   if (options.output === undefined) {
     await replaceSourceFile(source.path, verified.xml);
     return {
-      changes: publicationChanges(before, verified.model),
+      changes: writeChanges(before, verified.model),
       destination: source.path,
       layout,
       outputSha256,
@@ -272,14 +272,14 @@ export async function publishModel(
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new ModelPublicationError(
+    throw new ModelWriteError(
       "OUTPUT_WRITE_FAILED",
-      `Unable to publish BPMN: ${message}`
+      `Unable to write BPMN: ${message}`
     );
   }
 
   return {
-    changes: publicationChanges(before, verified.model),
+    changes: writeChanges(before, verified.model),
     destination: options.output,
     layout,
     outputSha256,

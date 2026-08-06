@@ -48,7 +48,7 @@ test("round-trips a complex collaboration without altering business semantics", 
     });
     const fluent = await BpmnModel.open(fixture);
     const temporary = join(directory, "roundtrip.bpmn");
-    const publication = await fluent.publish({
+    const result = await fluent.write({
       layout: "none",
       output: temporary
     });
@@ -58,7 +58,7 @@ test("round-trips a complex collaboration without altering business semantics", 
       file: temporary
     });
 
-    assert.equal(publication.semanticHash, original.semanticHash);
+    assert.equal(result.semanticHash, original.semanticHash);
     assert.equal(roundTripped.semanticHash, original.semanticHash);
     assert.equal(
       (await readFile(temporary, "utf8")).includes("bpmndi:BPMNDiagram"),

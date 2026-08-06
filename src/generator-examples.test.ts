@@ -109,7 +109,7 @@ test("generator examples meet repeatable local acceptance metrics", async () => 
         cwd: process.cwd()
       });
       const executionMilliseconds = performance.now() - started;
-      const publication = JSON.parse(execution.stdout) as {
+      const result = JSON.parse(execution.stdout) as {
         semanticHash: string;
         status: string;
       };
@@ -129,9 +129,9 @@ test("generator examples meet repeatable local acceptance metrics", async () => 
         executionMilliseconds <= maxExecutionMilliseconds,
         `${example.name} took ${executionMilliseconds.toFixed(0)} ms; limit is ${maxExecutionMilliseconds} ms`
       );
-      assert.equal(publication.status, "written");
-      assert.equal(localCamundaModel.semanticHash, publication.semanticHash);
-      assert.match(publication.semanticHash, /^[a-f0-9]{64}$/);
+      assert.equal(result.status, "written");
+      assert.equal(localCamundaModel.semanticHash, result.semanticHash);
+      assert.match(result.semanticHash, /^[a-f0-9]{64}$/);
       assert.match(outputXml, /<bpmn:definitions\b/);
       assert.deepEqual(
         localCamundaModel.diagnostics.filter(

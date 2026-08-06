@@ -5,7 +5,7 @@ const processBuilder = await Bpmn.createProcess("Process_leave_request", {
   name: "Leave request"
 });
 
-const publication = await processBuilder
+const result = await processBuilder
   .startEvent("Start_leave_requested", { name: "Leave requested" })
   .userTask("Task_manager_review", {
     name: "Manager review",
@@ -24,6 +24,6 @@ const publication = await processBuilder
   .branch("rejected", (branch) =>
     branch.defaultFlow().endEvent("End_leave_rejected", { name: "Leave rejected" })
   )
-  .publish({ output });
+  .write({ output });
 
-console.log(JSON.stringify(publication));
+console.log(JSON.stringify(result));

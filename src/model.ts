@@ -7,10 +7,10 @@ import {
   type SourceDocument
 } from "./model-loader.js";
 import {
-  publishModel,
+  writeModel,
   type ModelRuntimeOptions,
-  type PublicationResult,
-  type PublishOptions
+  type WriteResult,
+  type WriteOptions
 } from "./model-runtime.js";
 import {
   createElement,
@@ -1057,15 +1057,15 @@ export class BpmnModel {
     this.refreshIndexes();
   }
 
-  async publish(options: PublishOptions = {}): Promise<PublicationResult> {
+  async write(options: WriteOptions = {}): Promise<WriteResult> {
     if (this.isMemoryModel && options.output === undefined) {
       throw new ModelApiError(
         "OUTPUT_REQUIRED",
-        "BpmnModel.create() requires publish({ output })"
+        "BpmnModel.create() requires write({ output })"
       );
     }
 
-    return publishModel(
+    return writeModel(
       this.baseline,
       this.editable,
       this.source,

@@ -39,6 +39,29 @@ It creates executable processes, uses exact caller-supplied IDs, assigns
 conditions and default flows safely, applies deterministic layout by default,
 and delegates publication to the same verified atomic pipeline as `BpmnModel`.
 
+## Generate a collaboration
+
+Use the dedicated collaboration builder when a model contains pools and message
+flows. Its references are exact BPMN IDs; it does not share process-flow cursor
+state with `ProcessBuilder`.
+
+```ts
+const collaboration = await Bpmn.createCollaboration("order-collaboration");
+
+await collaboration
+  .process("buyer-process", { isExecutable: true })
+  .process("seller-process")
+  .participant("buyer", { name: "Buyer", processId: "buyer-process" })
+  .participant("seller", { name: "Seller", processId: "seller-process" })
+  .message("order-request", { name: "Order request" })
+  .messageFlow("request-flow", {
+    sourceId: "buyer",
+    targetId: "seller",
+    messageId: "order-request"
+  })
+  .publish({ output: "order-collaboration.bpmn", layout: "none" });
+```
+
 ## Edit an existing model
 
 ```ts

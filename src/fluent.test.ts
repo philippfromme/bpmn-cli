@@ -3,12 +3,143 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
-import { Bpmn, ProcessBuilderError } from "./index.js";
+import { Bpmn, BpmnModel, ModelApiError, ProcessBuilderError } from "./index.js";
 import {
   isModdleElement,
   moddleElements,
   withTemporaryDirectory
 } from "./test-support.test.js";
+
+test("builds, publishes, and reloads a collaboration with exact ID references", async () => {
+  await withTemporaryDirectory("bpmn-collaboration-builder", async (directory) => {
+    const output = join(directory, "order-collaboration.bpmn");
+    const collaboration = await Bpmn.createCollaboration("Collaboration_order", {
+      name: "Order collaboration"
+    });
+    const model = collaboration
+      .process("Process_buyer", { isExecutable: true, name: "Buyer process" })
+      .process("Process_seller", { name: "Seller process" })
+      .participant("Participant_buyer", {
+        name: "Buyer",
+        processId: "Process_buyer"
+      })
+      .participant("Participant_seller", {
+        name: "Seller",
+        processId: "Process_seller"
+      })
+      .message("Message_order", { name: "Order request" })
+      .messageFlow("MessageFlow_order", {
+        messageId: "Message_order",
+        name: "Send order",
+        sourceId: "Participant_buyer",
+        targetId: "Participant_seller"
+      })
+      .build();
+
+    const publication = await collaboration.publish({ layout: "none", output });
+    const buyer = model.element<"bpmn:Participant">("Participant_buyer");
+    const flow = model.element<"bpmn:MessageFlow">("MessageFlow_order");
+    const reopened = await BpmnModel.open(output);
+
+    assert.equal(publication.status, "written");
+    assert.equal(model.element("Collaboration_order").name, "Order collaboration");
+    assert.equal(buyer.raw.get("processRef"), model.element("Process_buyer").raw);
+    assert.equal(flow.raw.get("sourceRef"), buyer.raw);
+    assert.equal(
+      flow.raw.get("targetRef"),
+      model.element("Participant_seller").raw
+    );
+    assert.equal(flow.raw.get("messageRef"), model.element("Message_order").raw);
+    assert.equal(
+      reopened.element("MessageFlow_order").raw.get("sourceRef"),
+      reopened.element("Participant_buyer").raw
+    );
+    assert.equal(
+      reopened.element("MessageFlow_order").raw.get("messageRef"),
+      reopened.element("Message_order").raw
+    );
+  });
+});
+
+test("rejects missing and mistyped collaboration reference IDs before mutation", async () => {
+  const collaboration = await Bpmn.createCollaboration("Collaboration_order");
+  const builder = collaboration
+    .process("Process_order")
+    .participant("Participant_buyer", { processId: "Process_order" })
+    .message("Message_order");
+
+  assert.throws(
+    () => builder.participant("Participant_missing", { processId: "missing" }),
+    (error: unknown) =>
+      error instanceof ModelApiError && error.code === "ELEMENT_NOT_FOUND"
+  );
+  assert.throws(
+    () => builder.participant("Participant_wrong", { processId: "Message_order" }),
+    (error: unknown) =>
+      error instanceof ModelApiError && error.code === "INVALID_PROPERTY"
+  );
+  assert.throws(
+    () => builder.messageFlow("MessageFlow_missing", {
+      sourceId: "Participant_buyer",
+      targetId: "missing"
+    }),
+    (error: unknown) =>
+      error instanceof ModelApiError && error.code === "ELEMENT_NOT_FOUND"
+  );
+  assert.throws(
+    () => builder.messageFlow("MessageFlow_wrong", {
+      messageId: "Participant_buyer",
+      sourceId: "Participant_buyer",
+      targetId: "Participant_buyer"
+    }),
+    (error: unknown) =>
+      error instanceof ModelApiError && error.code === "INVALID_CONNECTION"
+  );
+  assert.throws(
+    () => builder.messageFlow("MessageFlow_invalid_endpoint", {
+      sourceId: "Process_order",
+      targetId: "Participant_buyer"
+    }),
+    (error: unknown) =>
+      error instanceof ModelApiError && error.code === "INVALID_CONNECTION"
+  );
+
+  const model = builder.build();
+  const foreignModel = await BpmnModel.create();
+  const foreignCollaboration = foreignModel.rootElement("bpmn:Collaboration", {
+    id: "Collaboration_foreign"
+  });
+  const foreignParticipant = foreignModel.create("bpmn:Participant", {
+    id: "Participant_foreign"
+  });
+  foreignModel.append(foreignCollaboration, foreignParticipant, "participants");
+
+  assert.throws(
+    () => model.messageFlow(
+      "Collaboration_order",
+      foreignParticipant,
+      "Participant_buyer",
+      { id: "MessageFlow_foreign" }
+    ),
+    (error: unknown) =>
+      error instanceof ModelApiError && error.code === "FOREIGN_ELEMENT"
+  );
+  assert.throws(
+    () => model.element("Participant_missing"),
+    (error: unknown) =>
+      error instanceof ModelApiError && error.code === "ELEMENT_NOT_FOUND"
+  );
+  assert.throws(
+    () => model.element("MessageFlow_missing"),
+    (error: unknown) =>
+      error instanceof ModelApiError && error.code === "ELEMENT_NOT_FOUND"
+  );
+  assert.throws(
+    () => model.element("MessageFlow_invalid_endpoint"),
+    (error: unknown) =>
+      error instanceof ModelApiError && error.code === "ELEMENT_NOT_FOUND"
+  );
+});
 
 test("builds and publishes a branched Zeebe process", async () => {
   await withTemporaryDirectory("bpmn-process-builder", async (directory) => {

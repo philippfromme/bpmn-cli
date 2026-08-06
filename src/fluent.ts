@@ -1,4 +1,9 @@
-import { BpmnModel, type IoInput, type ModelElement } from "./model.js";
+import {
+  BpmnModel,
+  ModelApiError,
+  type IoInput,
+  type ModelElement
+} from "./model.js";
 import type {
   PublicationResult,
   PublishOptions
@@ -7,6 +12,27 @@ import type {
 export interface ProcessOptions {
   isExecutable?: boolean;
   name?: string;
+}
+
+export interface CollaborationOptions {
+  isClosed?: boolean;
+  name?: string;
+}
+
+export interface ParticipantOptions {
+  name?: string;
+  processId?: string;
+}
+
+export interface MessageOptions {
+  name?: string;
+}
+
+export interface MessageFlowOptions {
+  messageId?: string;
+  name?: string;
+  sourceId: string;
+  targetId: string;
 }
 
 export interface NodeOptions {
@@ -1006,6 +1032,80 @@ export class ProcessBuilder {
   }
 }
 
+function exactReference(
+  model: BpmnModel,
+  id: string,
+  expectedType: string,
+  property: string
+): ModelElement {
+  const element = model.element(id);
+  if (!element.raw.$instanceOf(expectedType)) {
+    throw new ModelApiError(
+      "INVALID_PROPERTY",
+      `${property} must reference ${expectedType} elements`
+    );
+  }
+  return element;
+}
+
+export class CollaborationBuilder {
+  constructor(
+    private readonly model: BpmnModel,
+    private readonly collaboration: ModelElement<"bpmn:Collaboration">
+  ) {}
+
+  process(id: string, options: ProcessOptions = {}): this {
+    this.model.process({
+      id,
+      isExecutable: options.isExecutable,
+      name: options.name
+    });
+    return this;
+  }
+
+  participant(id: string, options: ParticipantOptions = {}): this {
+    if (options.processId !== undefined) {
+      exactReference(this.model, options.processId, "bpmn:Process", "bpmn:Participant.processRef");
+    }
+    const participant = this.model.create("bpmn:Participant", {
+      id,
+      name: options.name
+    });
+    this.model.append(this.collaboration, participant, "participants");
+    if (options.processId !== undefined) {
+      participant.setReferences({ processRef: options.processId });
+    }
+    return this;
+  }
+
+  message(id: string, options: MessageOptions = {}): this {
+    this.model.rootElement("bpmn:Message", { id, name: options.name });
+    return this;
+  }
+
+  messageFlow(id: string, options: MessageFlowOptions): this {
+    this.model.messageFlow(
+      this.collaboration,
+      options.sourceId,
+      options.targetId,
+      {
+        id,
+        message: options.messageId,
+        name: options.name
+      }
+    );
+    return this;
+  }
+
+  build(): BpmnModel {
+    return this.model;
+  }
+
+  publish(options: PublishOptions): Promise<PublicationResult> {
+    return this.build().publish(options);
+  }
+}
+
 export const Bpmn = {
   async createProcess(
     id: string,
@@ -1015,6 +1115,18 @@ export const Bpmn = {
     return new ProcessBuilder(model, model.process({
       id,
       isExecutable: options.isExecutable ?? true,
+      name: options.name
+    }));
+  },
+
+  async createCollaboration(
+    id: string,
+    options: CollaborationOptions = {}
+  ): Promise<CollaborationBuilder> {
+    const model = await BpmnModel.create();
+    return new CollaborationBuilder(model, model.rootElement("bpmn:Collaboration", {
+      id,
+      isClosed: options.isClosed,
       name: options.name
     }));
   }

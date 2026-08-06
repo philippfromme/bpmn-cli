@@ -4,6 +4,33 @@
 BPMN XML remains the durable artifact, while the fluent API owns safe moddle
 construction and publication.
 
+## Generate a collaboration
+
+`Bpmn.createCollaboration(id, options)` returns `CollaborationBuilder`, which
+is separate from `ProcessBuilder` and is intended for root processes, pools,
+messages, and message flows. It exposes `process`, `participant`, `message`,
+and `messageFlow`; each ID is caller supplied. `processId`, `sourceId`,
+`targetId`, and `messageId` are exact references to already-created BPMN
+elements. A participant may omit `processId` for a black-box pool, and a
+message flow may omit `messageId`.
+
+```ts
+const collaboration = await Bpmn.createCollaboration("order-collaboration");
+
+await collaboration
+  .process("buyer-process", { isExecutable: true })
+  .process("seller-process")
+  .participant("buyer", { processId: "buyer-process" })
+  .participant("seller", { processId: "seller-process" })
+  .message("order-request")
+  .messageFlow("request-flow", {
+    sourceId: "buyer",
+    targetId: "seller",
+    messageId: "order-request"
+  })
+  .publish({ output: "order-collaboration.bpmn", layout: "none" });
+```
+
 ## Generate a process
 
 Use `Bpmn` for a one-shot generator script. It is the high-level semantic API;

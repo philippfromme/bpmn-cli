@@ -138,6 +138,10 @@ function isSequenceFlowEndpoint(element: ModdleElement): boolean {
   return element.$instanceOf("bpmn:FlowNode");
 }
 
+function isMessageFlowEndpoint(element: ModdleElement): boolean {
+  return element.$instanceOf("bpmn:InteractionNode");
+}
+
 function isScalarProperty(property: {
   isAttr?: boolean;
   isMany?: boolean;
@@ -799,6 +803,58 @@ export class BpmnModel {
     this.append(parent, flow, "flowElements");
     this.addReciprocal(sourceElement.raw, "outgoing", flow.raw);
     this.addReciprocal(targetElement.raw, "incoming", flow.raw);
+    return flow;
+  }
+
+  messageFlow(
+    collaboration: string | ModelElement<"bpmn:Collaboration">,
+    source: string | ModelElement,
+    target: string | ModelElement,
+    properties: {
+      id?: string;
+      message?: string | ModelElement<"bpmn:Message">;
+      name?: string;
+    } = {}
+  ): ModelElement<"bpmn:MessageFlow"> {
+    const selectedCollaboration = typeof collaboration === "string"
+      ? this.element<"bpmn:Collaboration">(collaboration)
+      : collaboration;
+    const sourceElement = typeof source === "string" ? this.element(source) : source;
+    const targetElement = typeof target === "string" ? this.element(target) : target;
+    const message = properties.message === undefined
+      ? undefined
+      : typeof properties.message === "string"
+        ? this.element<"bpmn:Message">(properties.message)
+        : properties.message;
+    this.assertOwnedWrapper(selectedCollaboration);
+    this.assertOwnedWrapper(sourceElement);
+    this.assertOwnedWrapper(targetElement);
+    if (message !== undefined) {
+      this.assertOwnedWrapper(message);
+    }
+
+    if (
+      !selectedCollaboration.raw.$instanceOf("bpmn:Collaboration") ||
+      !isMessageFlowEndpoint(sourceElement.raw) ||
+      !isMessageFlowEndpoint(targetElement.raw) ||
+      (message !== undefined && !message.raw.$instanceOf("bpmn:Message"))
+    ) {
+      throw new ModelApiError(
+        "INVALID_CONNECTION",
+        "MessageFlow requires a collaboration, interaction-node endpoints, and an optional message"
+      );
+    }
+
+    const flow = this.create("bpmn:MessageFlow", {
+      id: properties.id,
+      name: properties.name
+    });
+    flow.raw.set("sourceRef", sourceElement.raw);
+    flow.raw.set("targetRef", targetElement.raw);
+    if (message !== undefined) {
+      flow.raw.set("messageRef", message.raw);
+    }
+    this.append(selectedCollaboration, flow, "messageFlows");
     return flow;
   }
 

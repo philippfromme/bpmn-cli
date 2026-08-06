@@ -48,7 +48,7 @@ void invalidBoundaryReferences;
   void invalidContainedChildProperty;
 
 const zeebeFixture = fileURLToPath(
-  new URL("../test/fixtures/AI Email Support Agent.bpmn", import.meta.url)
+  new URL("../test/fixtures/blueprint.ai-email-support-agent.bpmn", import.meta.url)
 );
 
 async function withTemporaryDirectory(

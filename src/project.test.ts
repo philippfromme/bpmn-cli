@@ -19,7 +19,7 @@ const zeebe = require(
   "zeebe-bpmn-moddle/resources/zeebe.json"
 ) as Record<string, unknown>;
 const fixture = fileURLToPath(
-  new URL("../test/fixtures/AI Email Support Agent.bpmn", import.meta.url)
+  new URL("../test/fixtures/blueprint.ai-email-support-agent.bpmn", import.meta.url)
 );
 
 test("classifies every descriptor property reached in the real fixture", async () => {

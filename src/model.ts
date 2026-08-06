@@ -169,6 +169,19 @@ export class IoMappingBuilder {
     this.model.append(this.raw, parameter, "inputParameters");
     return parameter;
   }
+
+  addOutput(output: IoInput): ModelElement<"zeebe:Output"> {
+    if (output.source.length === 0 || output.target.length === 0) {
+      throw new ModelApiError(
+        "INVALID_EXTENSION",
+        "Zeebe I/O outputs require non-empty source and target values"
+      );
+    }
+
+    const parameter = this.model.create("zeebe:Output", output);
+    this.model.append(this.raw, parameter, "outputParameters");
+    return parameter;
+  }
 }
 
 export class ExtensionElementsBuilder {

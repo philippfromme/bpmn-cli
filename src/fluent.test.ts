@@ -26,7 +26,12 @@ test("builds and publishes a branched Zeebe process", async () => {
           .condition("= approved")
           .serviceTask("notify", {
             name: "Notify requester",
-            taskType: "send-email"
+            taskType: "send-email",
+            retries: "3",
+            inputs: [{ source: "=requester.email", target: "email" }],
+            outputs: [{ source: "=response.id", target: "messageId" }],
+            headers: { priority: "high" },
+            properties: { connector: "email" }
           })
           .endEvent("done")
       )
@@ -62,6 +67,7 @@ test("builds and publishes a branched Zeebe process", async () => {
     assert.ok(isModdleElement(defaultTarget));
     assert.equal(defaultTarget.id, "rejected");
     assert.equal(taskDefinition?.get("type"), "send-email");
+    assert.equal(taskDefinition?.get("retries"), "3");
     assert.match(await readFile(output, "utf8"), /bpmndi:BPMNDiagram/);
   });
 });

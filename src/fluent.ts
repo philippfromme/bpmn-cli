@@ -1,7 +1,4 @@
-import {
-  BpmnModel,
-  type ModelElement
-} from "./model.js";
+import { BpmnModel, type IoInput, type ModelElement } from "./model.js";
 import type {
   PublicationResult,
   PublishOptions
@@ -17,7 +14,16 @@ export interface NodeOptions {
 }
 
 export interface ServiceTaskOptions extends NodeOptions {
+  headers?: Readonly<Record<string, string>>;
+  inputs?: readonly IoInput[];
+  outputs?: readonly IoInput[];
+  properties?: Readonly<Record<string, string>>;
+  retries?: string;
   taskType?: string;
+}
+
+export interface UserTaskOptions extends NodeOptions {
+  formId?: string;
 }
 
 type FlowNodeType =
@@ -67,17 +73,38 @@ function createFlowNode(
   return { flow, node };
 }
 
-function configureTaskType(
+function configureServiceTask(
   task: ModelElement<"bpmn:ServiceTask">,
-  taskType: string
+  options: ServiceTaskOptions
 ): void {
-  if (taskType.trim().length === 0) {
+  if (options.taskType !== undefined && options.taskType.trim().length === 0) {
     throw new ProcessBuilderError(
       "INVALID_TASK_TYPE",
       "A Zeebe service task type must not be empty"
     );
   }
-  task.extensions.ensure("zeebe:TaskDefinition").raw.set("type", taskType);
+  if (options.taskType !== undefined || options.retries !== undefined) {
+    const definition = task.extensions.ensure("zeebe:TaskDefinition");
+    definition.setProperties({
+      retries: options.retries,
+      type: options.taskType
+    });
+  }
+  const mapping = task.extensions.ensure("zeebe:IoMapping");
+  for (const input of options.inputs ?? []) mapping.addInput(input);
+  for (const output of options.outputs ?? []) mapping.addOutput(output);
+  if (options.headers !== undefined) {
+    const headers = task.extensions.ensure("zeebe:TaskHeaders");
+    for (const [key, value] of Object.entries(options.headers)) {
+      headers.createChild("values", "zeebe:Header", { key, value });
+    }
+  }
+  if (options.properties !== undefined) {
+    const properties = task.extensions.ensure("zeebe:Properties");
+    for (const [name, value] of Object.entries(options.properties)) {
+      properties.createChild("properties", "zeebe:Property", { name, value });
+    }
+  }
 }
 
 export class BranchBuilder {
@@ -124,15 +151,15 @@ export class BranchBuilder {
     return this;
   }
 
-  userTask(id: string, options: NodeOptions = {}): this {
-    return this.addNode("bpmn:UserTask", id, options);
+  userTask(id: string, options: UserTaskOptions = {}): this {
+    this.addNode("bpmn:UserTask", id, options);
+    if (options.formId !== undefined) this.model.element<"bpmn:UserTask">(id).configureForm({ formId: options.formId });
+    return this;
   }
 
   serviceTask(id: string, options: ServiceTaskOptions = {}): this {
     this.addNode("bpmn:ServiceTask", id, options);
-    if (options.taskType !== undefined) {
-      configureTaskType(this.model.element<"bpmn:ServiceTask">(id), options.taskType);
-    }
+    configureServiceTask(this.model.element<"bpmn:ServiceTask">(id), options);
     return this;
   }
 
@@ -224,15 +251,15 @@ export class ProcessBuilder {
     return this;
   }
 
-  userTask(id: string, options: NodeOptions = {}): this {
-    return this.addNode("bpmn:UserTask", id, options);
+  userTask(id: string, options: UserTaskOptions = {}): this {
+    this.addNode("bpmn:UserTask", id, options);
+    if (options.formId !== undefined) this.model.element<"bpmn:UserTask">(id).configureForm({ formId: options.formId });
+    return this;
   }
 
   serviceTask(id: string, options: ServiceTaskOptions = {}): this {
     this.addNode("bpmn:ServiceTask", id, options);
-    if (options.taskType !== undefined) {
-      configureTaskType(this.model.element<"bpmn:ServiceTask">(id), options.taskType);
-    }
+    configureServiceTask(this.model.element<"bpmn:ServiceTask">(id), options);
     return this;
   }
 

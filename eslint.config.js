@@ -5,6 +5,15 @@ export default tseslint.config(
   {
     ignores: ["dist/", "src/model-types.generated/"]
   },
+  {
+    files: ["examples/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        console: "readonly",
+        process: "readonly"
+      }
+    }
+  },
   js.configs.recommended,
   tseslint.configs.recommended
 );

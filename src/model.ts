@@ -14,6 +14,7 @@ import {
 } from "./model-runtime.js";
 import {
   createElement,
+  type ContainedChildProperty,
   type ElementProperties,
   type ElementPropertiesInput,
   type SupportedElementType,
@@ -383,7 +384,7 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
   }
 
   child<ChildType extends SupportedElementType = SupportedElementType>(
-    property: string
+    property: ContainedChildProperty<Type>
   ): ModelElement<ChildType> {
     const descriptor = typedDescriptorProperties(this.raw).find(
       (candidate) => candidate.name === property
@@ -404,7 +405,7 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
   }
 
   children<ChildType extends SupportedElementType = SupportedElementType>(
-    property: string
+    property: ContainedChildProperty<Type>
   ): ModelElement<ChildType>[] {
     const descriptor = typedDescriptorProperties(this.raw).find(
       (candidate) => candidate.name === property
@@ -425,7 +426,7 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
   }
 
   createChild<ChildType extends SupportedElementType>(
-    property: string,
+    property: ContainedChildProperty<Type>,
     type: ChildType,
     properties: ElementPropertiesInput<ChildType> & { id?: string }
   ): ModelElement<ChildType> {
@@ -434,7 +435,7 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
     return child;
   }
 
-  removeChild(property: string, child: ModelElement): void {
+  removeChild(property: ContainedChildProperty<Type>, child: ModelElement): void {
     const descriptor = typedDescriptorProperties(this.raw).find(
       (candidate) => candidate.name === property
     );

@@ -4,6 +4,7 @@ import {
   descriptorPropertyClassifications,
   getDescriptorPropertyClassification,
   supportedElementTypes,
+  type ContainedChildProperty,
   type DescriptorPropertyClassification,
   type ElementProperties,
   type SupportedElementType
@@ -13,6 +14,7 @@ export {
   descriptorPropertyClassifications,
   getDescriptorPropertyClassification,
   supportedElementTypes,
+  type ContainedChildProperty,
   type DescriptorPropertyClassification,
   type ElementProperties,
   type SupportedElementType

@@ -41,6 +41,12 @@ const invalidBoundaryReferences: BoundaryEventReferenceProperties = {
 };
 void invalidBoundaryReferences;
 
+  // @ts-expect-error Sequence-flow references are not contained children.
+  const invalidContainedChildProperty: Parameters<
+    ModelElement<"bpmn:ServiceTask">["child"]
+  >[0] = "outgoing";
+  void invalidContainedChildProperty;
+
 const zeebeFixture = fileURLToPath(
   new URL("../test/fixtures/AI Email Support Agent.bpmn", import.meta.url)
 );
@@ -272,7 +278,7 @@ test("accesses contained extension elements through an exact-ID owner", async ()
   taskDefinition.setProperties({ type: "after" });
 
   assert.equal(taskDefinition.raw.get("type"), "after");
-  expectModelError("INVALID_PROPERTY", () => task.child("outgoing"));
+  expectModelError("INVALID_PROPERTY", () => task.child("outgoing" as never));
 });
 
 test("creates contained Zeebe extension children through an exact-ID owner", async () => {
@@ -294,7 +300,7 @@ test("creates contained Zeebe extension children through an exact-ID owner", asy
   assert.equal(input.raw.get("source"), "=customer.id");
   assert.deepEqual(mapping.children("inputParameters").map(({ raw }) => raw), [input.raw]);
   expectModelError("INVALID_CONTAINMENT", () =>
-    task.createChild("outgoing", "bpmn:EndEvent", {})
+    task.createChild("outgoing" as never, "bpmn:EndEvent", {})
   );
 });
 

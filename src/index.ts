@@ -1,5 +1,5 @@
 export {
-  BpmnEditor,
+  Bpmn,
   CustomExtensionElement,
   ModelApiError,
   type CreateModelOptions,
@@ -10,6 +10,7 @@ export {
   type ReferenceProperties,
   type ScalarProperties
 } from "./model.js";
+export type { BpmnEditor } from "./model.js";
 export {
   descriptorPropertyClassifications,
   getDescriptorPropertyClassification,
@@ -24,7 +25,6 @@ export {
   type WriteOptions
 } from "./model-runtime.js";
 export {
-  Bpmn,
   BranchBuilder,
   CollaborationBuilder,
   ProcessBuilder,

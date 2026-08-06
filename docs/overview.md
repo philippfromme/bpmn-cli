@@ -4,6 +4,9 @@
 BPMN XML remains the durable artifact, while the fluent API owns safe moddle
 construction and output writing.
 
+`Bpmn` is the single public entry point for generating, opening, and creating
+models.
+
 ## Generate a collaboration
 
 `Bpmn.createCollaboration(id, options)` returns `CollaborationBuilder`, which
@@ -60,7 +63,7 @@ await process
 
 Exclusive and inclusive branches must begin with `condition(expression)` or
 `defaultFlow()` and end with `endEvent()` or `join()`. `editor()` returns the
-shared `BpmnEditor` when a script needs the lower-level exact-ID API before
+shared editor when a script needs the lower-level exact-ID API before
 writing. `build()` validates fluent completion and returns that same editor.
 `write()` retains the standard validation, deterministic
 auto-layout, semantic verification, and atomic-output behavior.
@@ -126,9 +129,9 @@ is separate from process-flow construction.
 ## Open and change an existing model
 
 ```ts
-import { BpmnEditor } from "@philippfromme/bpmn-cli";
+import { Bpmn } from "@philippfromme/bpmn-cli";
 
-const model = await BpmnEditor.open("customer-support.bpmn");
+const model = await Bpmn.open("customer-support.bpmn");
 const task = model.element("ServiceTask_1");
 task.extensions.ensure("zeebe:IoMapping").addInput({
   source: "=customer.id",
@@ -157,7 +160,9 @@ gateway default flow remains claimed.
 ## Create a model
 
 ```ts
-const model = await BpmnEditor.create();
+import { Bpmn } from "@philippfromme/bpmn-cli";
+
+const model = await Bpmn.create();
 const process = model.process({ name: "Customer email" });
 const task = model.create("bpmn:UserTask", { name: "Send customer email" });
 model.append(process, task, "flowElements");
@@ -178,7 +183,7 @@ For custom extensions, provide a moddle descriptor when opening the model and
 use the descriptor-validated escape hatch:
 
 ```ts
-const model = await BpmnEditor.open("model.bpmn", {
+const model = await Bpmn.open("model.bpmn", {
   extensions: ["acme=acme-moddle.json"]
 });
 const settings = model.element("Task_1").extensions.ensureCustom(

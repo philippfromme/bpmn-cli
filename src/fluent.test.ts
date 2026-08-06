@@ -5,7 +5,6 @@ import test from "node:test";
 
 import {
   Bpmn,
-  BpmnEditor,
   ModelApiError,
   ProcessBuilder,
   ProcessBuilderError
@@ -45,7 +44,7 @@ test("builds, writes, and reloads a collaboration with exact ID references", asy
     const result = await collaboration.write({ layout: "none", output });
     const buyer = model.element<"bpmn:Participant">("Participant_buyer");
     const flow = model.element<"bpmn:MessageFlow">("MessageFlow_order");
-    const reopened = await BpmnEditor.open(output);
+    const reopened = await Bpmn.open(output);
 
     assert.equal(result.status, "written");
     assert.equal(model.element("Collaboration_order").name, "Order collaboration");
@@ -82,7 +81,7 @@ test("hands fluent builders to their shared editor", async () => {
     assert.equal(process.build(), editor);
 
     const result = await process.write({ output });
-    const reopened = await BpmnEditor.open(output);
+    const reopened = await Bpmn.open(output);
 
     assert.equal(result.status, "written");
     assert.equal(reopened.element("Task_shared").name, "Changed through editor");
@@ -104,7 +103,7 @@ test("hands fluent builders to their shared editor", async () => {
 test("continues an exact editor process from an explicit flow node", async () => {
   await withTemporaryDirectory("bpmn-editor-compose", async (directory) => {
     const output = join(directory, "continued.bpmn");
-    const editor = await BpmnEditor.create();
+    const editor = await Bpmn.create();
     const process = editor.process({ id: "Process_continue" });
     const start = editor.create("bpmn:StartEvent", { id: "Start_continue" });
     const selected = editor.create("bpmn:UserTask", { id: "Task_continue" });
@@ -121,7 +120,7 @@ test("continues an exact editor process from an explicit flow node", async () =>
       .serviceTask("Task_next", { taskType: "continue" })
       .endEvent("End_continue");
     const result = await continuation.write({ output });
-    const reopened = await BpmnEditor.open(output);
+    const reopened = await Bpmn.open(output);
     const next = reopened.element("Task_next");
 
     assert.equal(result.status, "written");
@@ -138,8 +137,8 @@ test("continues an exact editor process from an explicit flow node", async () =>
 });
 
 test("rejects invalid process composition targets and preserves terminal and branch state", async () => {
-  const editor = await BpmnEditor.create();
-  const foreignEditor = await BpmnEditor.create();
+  const editor = await Bpmn.create();
+  const foreignEditor = await Bpmn.create();
   const first = editor.process({ id: "Process_first" });
   const second = editor.process({ id: "Process_second" });
   const start = editor.create("bpmn:StartEvent", { id: "Start_first" });
@@ -239,7 +238,7 @@ test("rejects missing and mistyped collaboration reference IDs before mutation",
   );
 
   const model = builder.build();
-  const foreignModel = await BpmnEditor.create();
+  const foreignModel = await Bpmn.create();
   const foreignCollaboration = foreignModel.rootElement("bpmn:Collaboration", {
     id: "Collaboration_foreign"
   });

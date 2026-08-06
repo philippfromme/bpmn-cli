@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { basename, join } from "node:path";
 import test from "node:test";
 
-import { BpmnEditor } from "./index.js";
+import { Bpmn, type BpmnEditor } from "./index.js";
 import { loadSemanticModel } from "./model-loader.js";
 import { isModdleElement, moddleElements } from "./test-support.test.js";
 
@@ -114,7 +114,7 @@ test("generator examples meet repeatable local acceptance metrics", async () => 
         status: string;
       };
       const outputXml = await readFile(output, "utf8");
-      const reloaded = await BpmnEditor.open(output);
+      const reloaded = await Bpmn.open(output);
       const localCamundaModel = await loadSemanticModel({
         autoProfile: true,
         extensions: [],

@@ -70,14 +70,18 @@ try {
   const consumerTypeScript = join(consumerRoot, "consumer.ts");
   await writeFile(
     consumerJavaScript,
-    `import { BpmnEditor } from "@philippfromme/bpmn-cli";
-if (typeof BpmnEditor !== "function") throw new Error("BpmnEditor export missing");`,
+    `import { Bpmn } from "@philippfromme/bpmn-cli";
+if (typeof Bpmn !== "object") throw new Error("Bpmn export missing");
+if (typeof Bpmn.create !== "function" || typeof Bpmn.open !== "function") {
+  throw new Error("Bpmn editor entry points missing");
+}`,
     "utf8"
   );
   await writeFile(
     consumerTypeScript,
     `import {
-  BpmnEditor,
+  Bpmn,
+  type BpmnEditor,
   type ElementProperties,
   type WriteOptions
 } from "@philippfromme/bpmn-cli";
@@ -85,7 +89,8 @@ const options: WriteOptions = { layout: "none" };
 const task: ElementProperties<"bpmn:ServiceTask"> = { retryCounter: "3" };
 void options;
 void task;
-void BpmnEditor.create;`,
+const model: BpmnEditor = await Bpmn.create();
+void model;`,
     "utf8"
   );
 

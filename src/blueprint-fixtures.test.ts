@@ -4,7 +4,7 @@ import { basename, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { BpmnEditor } from "./index.js";
+import { Bpmn } from "./index.js";
 import { loadSemanticModel } from "./model-loader.js";
 import { withTemporaryDirectory } from "./test-support.test.js";
 
@@ -47,7 +47,7 @@ test("round-trips BPMN and Zeebe semantics from every blueprint fixture", async 
         file: source
       });
       const output = join(directory, `roundtrip-${basename(source)}`);
-      const model = await BpmnEditor.open(source);
+      const model = await Bpmn.open(source);
       const result = await model.write({ layout: "none", output });
       const roundTripped = await loadSemanticModel({
         autoProfile: true,
@@ -76,7 +76,7 @@ test("edits nested Zeebe properties in a representative blueprint fixture", asyn
       directory
     );
     const output = join(directory, "edited.bpmn");
-    const model = await BpmnEditor.open(source);
+    const model = await Bpmn.open(source);
     const task = model.element<"bpmn:ServiceTask">("Reply_with_email_to_customer");
     const extensions = task.child("extensionElements");
     const definition = extensions
@@ -88,7 +88,7 @@ test("edits nested Zeebe properties in a representative blueprint fixture", asyn
     definition.setProperties({ retries: "5" });
     await model.write({ layout: "none", output });
 
-    const reopened = await BpmnEditor.open(output);
+    const reopened = await Bpmn.open(output);
     const editedTask = reopened.element<"bpmn:ServiceTask">(
       "Reply_with_email_to_customer"
     );

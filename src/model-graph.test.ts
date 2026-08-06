@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { BpmnEditor } from "./index.js";
+import { Bpmn } from "./index.js";
 import { expectModelError, moddleElements } from "./test-support.test.js";
 
 async function connectedModel() {
-  const model = await BpmnEditor.create();
+  const model = await Bpmn.create();
   const process = model.process();
   const first = model.create("bpmn:Task", { name: "First" });
   const second = model.create("bpmn:Task", { name: "Second" });
@@ -61,7 +61,7 @@ test("rejects invalid flow endpoints before creating a SequenceFlow", async () =
 test("rejects referenced element removal and cross-model raw elements", async () => {
   const { first, model, second } = await connectedModel();
   const flow = model.connect(first, second);
-  const foreignModel = await BpmnEditor.create();
+  const foreignModel = await Bpmn.create();
   const foreignProcess = foreignModel.process();
   const foreignTask = foreignModel.create("bpmn:Task", {});
   foreignModel.append(foreignProcess, foreignTask, "flowElements");

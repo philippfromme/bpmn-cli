@@ -23,7 +23,12 @@ import {
 import { typedDescriptorProperties } from "./moddle.js";
 import { resolveProfiles } from "./profiles.js";
 import { collectSemanticElements, type SemanticModel } from "./semantic.js";
-import { ProcessBuilder } from "./fluent.js";
+import {
+  CollaborationBuilder,
+  ProcessBuilder,
+  type CollaborationOptions,
+  type ProcessOptions
+} from "./fluent.js";
 
 export type OpenModelOptions = ModelRuntimeOptions;
 
@@ -32,6 +37,14 @@ export interface CreateModelOptions extends ModelRuntimeOptions {
   path?: string;
   targetNamespace?: string;
 }
+
+let openEditor: (
+  file: string,
+  options?: OpenModelOptions
+) => Promise<BpmnEditor>;
+let createEditor: (
+  options?: CreateModelOptions
+) => Promise<BpmnEditor>;
 
 export interface FormConfiguration {
   externalReference?: string;
@@ -569,66 +582,68 @@ export class BpmnEditor {
     this.refreshIndexes();
   }
 
-  static async open(
-    file: string,
-    options: OpenModelOptions = {}
-  ): Promise<BpmnEditor> {
-    const source = await readSourceDocument(file);
-    const loaderOptions = {
-      autoProfile: options.autoProfile ?? true,
-      extensions: [...(options.extensions ?? [])],
-      profile: options.profile
+  static {
+    openEditor = async (
+      file: string,
+      options: OpenModelOptions = {}
+    ): Promise<BpmnEditor> => {
+      const source = await readSourceDocument(file);
+      const loaderOptions = {
+        autoProfile: options.autoProfile ?? true,
+        extensions: [...(options.extensions ?? [])],
+        profile: options.profile
+      };
+      const [baseline, editable] = await Promise.all([
+        loadSemanticModelFromDocument(source, loaderOptions),
+        loadSemanticModelFromDocument(source, loaderOptions)
+      ]);
+      return new BpmnEditor(baseline, editable, source, options, false);
     };
-    const [baseline, editable] = await Promise.all([
-      loadSemanticModelFromDocument(source, loaderOptions),
-      loadSemanticModelFromDocument(source, loaderOptions)
-    ]);
-    return new BpmnEditor(baseline, editable, source, options, false);
-  }
 
-  static async create(
-    options: CreateModelOptions = {}
-  ): Promise<BpmnEditor> {
-    const profile = options.profile ?? "zeebe";
-    const runtimeOptions: ModelRuntimeOptions = {
-      autoProfile: options.autoProfile ?? false,
-      extensions: options.extensions,
-      profile
+    createEditor = async (
+      options: CreateModelOptions = {}
+    ): Promise<BpmnEditor> => {
+      const profile = options.profile ?? "zeebe";
+      const runtimeOptions: ModelRuntimeOptions = {
+        autoProfile: options.autoProfile ?? false,
+        extensions: options.extensions,
+        profile
+      };
+      const profiles = await resolveProfiles({
+        autoProfile: runtimeOptions.autoProfile ?? false,
+        documents: [],
+        extensions: [...(runtimeOptions.extensions ?? [])],
+        profile
+      });
+      const moddle = new BpmnModdle(profiles.packages);
+      const definitions = moddle.create("bpmn:Definitions", {
+        id: options.id ?? "Definitions_1",
+        rootElements: [],
+        targetNamespace: options.targetNamespace ?? "http://bpmn.io/schema/bpmn"
+      });
+      const xml = (await moddle.toXML(definitions, { format: true })).xml;
+      const source: SourceDocument = {
+        bytes: Buffer.from(xml),
+        path: options.path ?? "<memory>",
+        xml
+      };
+      const loaderOptions = {
+        autoProfile: runtimeOptions.autoProfile ?? false,
+        extensions: [...(runtimeOptions.extensions ?? [])],
+        profile
+      };
+      const [baseline, editable] = await Promise.all([
+        loadSemanticModelFromDocument(source, loaderOptions),
+        loadSemanticModelFromDocument(source, loaderOptions)
+      ]);
+      return new BpmnEditor(
+        baseline,
+        editable,
+        source,
+        runtimeOptions,
+        options.path === undefined
+      );
     };
-    const profiles = await resolveProfiles({
-      autoProfile: runtimeOptions.autoProfile ?? false,
-      documents: [],
-      extensions: [...(runtimeOptions.extensions ?? [])],
-      profile
-    });
-    const moddle = new BpmnModdle(profiles.packages);
-    const definitions = moddle.create("bpmn:Definitions", {
-      id: options.id ?? "Definitions_1",
-      rootElements: [],
-      targetNamespace: options.targetNamespace ?? "http://bpmn.io/schema/bpmn"
-    });
-    const xml = (await moddle.toXML(definitions, { format: true })).xml;
-    const source: SourceDocument = {
-      bytes: Buffer.from(xml),
-      path: options.path ?? "<memory>",
-      xml
-    };
-    const loaderOptions = {
-      autoProfile: runtimeOptions.autoProfile ?? false,
-      extensions: [...(runtimeOptions.extensions ?? [])],
-      profile
-    };
-    const [baseline, editable] = await Promise.all([
-      loadSemanticModelFromDocument(source, loaderOptions),
-      loadSemanticModelFromDocument(source, loaderOptions)
-    ]);
-    return new BpmnEditor(
-      baseline,
-      editable,
-      source,
-      runtimeOptions,
-      options.path === undefined
-    );
   }
 
   element<Type extends SupportedElementType = SupportedElementType>(
@@ -1073,7 +1088,7 @@ export class BpmnEditor {
     if (this.isMemoryModel && options.output === undefined) {
       throw new ModelApiError(
         "OUTPUT_REQUIRED",
-        "BpmnEditor.create() requires write({ output })"
+        "Bpmn.create() requires write({ output })"
       );
     }
 
@@ -1182,6 +1197,40 @@ export class BpmnEditor {
     return element;
   }
 }
+
+export const Bpmn = {
+  open(file: string, options: OpenModelOptions = {}): Promise<BpmnEditor> {
+    return openEditor(file, options);
+  },
+
+  create(options: CreateModelOptions = {}): Promise<BpmnEditor> {
+    return createEditor(options);
+  },
+
+  async createProcess(
+    id: string,
+    options: ProcessOptions = {}
+  ): Promise<ProcessBuilder> {
+    const model = await createEditor();
+    return new ProcessBuilder(model, model.process({
+      id,
+      isExecutable: options.isExecutable ?? true,
+      name: options.name
+    }));
+  },
+
+  async createCollaboration(
+    id: string,
+    options: CollaborationOptions = {}
+  ): Promise<CollaborationBuilder> {
+    const model = await createEditor();
+    return new CollaborationBuilder(model, model.rootElement("bpmn:Collaboration", {
+      id,
+      isClosed: options.isClosed,
+      name: options.name
+    }));
+  }
+};
 
 export class ProcessComposer {
   constructor(

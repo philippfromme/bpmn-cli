@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
-import { BpmnEditor, ModelWriteError } from "./index.js";
+import { Bpmn, ModelWriteError } from "./index.js";
 import { withTemporaryDirectory, writeBpmn } from "./test-support.test.js";
 
 test("reports added and changed semantic elements after verified write", async () => {
@@ -14,7 +14,7 @@ test("reports added and changed semantic elements after verified write", async (
       '  <bpmn:process id="Process_1"><bpmn:task id="Task_1" name="Before"/></bpmn:process>'
     );
     const output = join(directory, "output.bpmn");
-    const model = await BpmnEditor.open(source);
+    const model = await Bpmn.open(source);
     const process = model.element("Process_1");
     model.element("Task_1").setName("After");
     const added = model.create("bpmn:EndEvent", {});
@@ -35,7 +35,7 @@ test("reports added and changed semantic elements after verified write", async (
     assert.equal(result.status, "written");
     assert.match(result.outputSha256, /^[a-f0-9]{64}$/);
     assert.match(result.semanticHash, /^[a-f0-9]{64}$/);
-    assert.equal((await BpmnEditor.open(output)).element(added.id).type, "bpmn:EndEvent");
+    assert.equal((await Bpmn.open(output)).element(added.id).type, "bpmn:EndEvent");
   });
 });
 
@@ -46,7 +46,7 @@ test("replaces an opened source only when no output is requested", async () => {
       "source.bpmn",
       '  <bpmn:process id="Process_1"><bpmn:task id="Task_1" name="Before"/></bpmn:process>'
     );
-    const model = await BpmnEditor.open(source);
+    const model = await Bpmn.open(source);
     model.element("Task_1").setName("After");
 
     const result = await model.write({ layout: "none", validate: false });
@@ -64,7 +64,7 @@ test("protects existing outputs, permits explicit replacement, and rejects sourc
     );
     const output = join(directory, "output.bpmn");
     await writeFile(output, "existing", "utf8");
-    const model = await BpmnEditor.open(source);
+    const model = await Bpmn.open(source);
 
     await assert.rejects(
       model.write({ layout: "none", output }),
@@ -89,8 +89,8 @@ test("produces deterministic results for equivalent model programs", async () =>
   await withTemporaryDirectory("bpmn-write-determinism", async (directory) => {
     const firstOutput = join(directory, "first.bpmn");
     const secondOutput = join(directory, "second.bpmn");
-    const first = await BpmnEditor.create();
-    const second = await BpmnEditor.create();
+    const first = await Bpmn.create();
+    const second = await Bpmn.create();
 
     for (const model of [first, second]) {
       const process = model.process();

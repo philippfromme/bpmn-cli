@@ -4,7 +4,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { BpmnEditor } from "./index.js";
+import { Bpmn } from "./index.js";
 import { loadSemanticModel } from "./model-loader.js";
 import { withTemporaryDirectory } from "./test-support.test.js";
 
@@ -46,7 +46,7 @@ test("round-trips a complex collaboration without altering business semantics", 
       extensions: [],
       file: fixture
     });
-    const fluent = await BpmnEditor.open(fixture);
+    const fluent = await Bpmn.open(fixture);
     const temporary = join(directory, "roundtrip.bpmn");
     const result = await fluent.write({
       layout: "none",

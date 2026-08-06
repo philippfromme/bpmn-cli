@@ -1166,29 +1166,3 @@ export class CollaborationBuilder {
     return this.model;
   }
 }
-
-export const Bpmn = {
-  async createProcess(
-    id: string,
-    options: ProcessOptions = {}
-  ): Promise<ProcessBuilder> {
-    const model = await BpmnEditor.create();
-    return new ProcessBuilder(model, model.process({
-      id,
-      isExecutable: options.isExecutable ?? true,
-      name: options.name
-    }));
-  },
-
-  async createCollaboration(
-    id: string,
-    options: CollaborationOptions = {}
-  ): Promise<CollaborationBuilder> {
-    const model = await BpmnEditor.create();
-    return new CollaborationBuilder(model, model.rootElement("bpmn:Collaboration", {
-      id,
-      isClosed: options.isClosed,
-      name: options.name
-    }));
-  }
-};

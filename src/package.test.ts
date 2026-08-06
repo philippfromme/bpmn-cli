@@ -3,7 +3,7 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-test("writes a resolvable fluent API entry point", async () => {
+test("writes a resolvable central Bpmn API entry point", async () => {
   const manifestPath = fileURLToPath(new URL("../package.json", import.meta.url));
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
     exports: {
@@ -25,5 +25,9 @@ test("writes a resolvable fluent API entry point", async () => {
   await access(fileURLToPath(new URL("./index.js", import.meta.url)));
   const library = await import("./index.js");
   assert.equal(typeof library.Bpmn, "object");
-  assert.equal(typeof library.BpmnEditor, "function");
+  assert.equal(typeof library.Bpmn.create, "function");
+  assert.equal(typeof library.Bpmn.open, "function");
+  assert.equal(typeof library.Bpmn.createProcess, "function");
+  assert.equal(typeof library.Bpmn.createCollaboration, "function");
+  assert.equal("BpmnEditor" in library, false);
 });

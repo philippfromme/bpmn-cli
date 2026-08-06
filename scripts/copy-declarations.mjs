@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { cp, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
@@ -8,6 +8,11 @@ await mkdir(destination, { recursive: true });
 await copyFile(
   resolve(root, "src", "bpmn-moddle.d.ts"),
   resolve(destination, "bpmn-moddle.d.ts")
+);
+await cp(
+  resolve(root, "src", "model-types.generated"),
+  resolve(destination, "model-types.generated"),
+  { force: true, recursive: true }
 );
 
 const entryPoint = resolve(destination, "index.d.ts");

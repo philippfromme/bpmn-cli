@@ -43,6 +43,7 @@
     "test:coverage": "npm run build:test && node --test --experimental-test-coverage --test-coverage-lines=70 --test-coverage-branches=85 --test-coverage-functions=75 \"dist/*.test.js\" && npm run package:check"
   },
   "devDependencies": {
+    "@bpmn-io/moddle-types-generator": "^0.2.0",
     "@eslint/js": "^9.39.1",
     "eslint": "^9.39.1",
     "typescript": "^5.9.3",

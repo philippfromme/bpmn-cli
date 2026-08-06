@@ -14,6 +14,10 @@ import {
 const serviceTaskProperties: ElementProperties<"bpmn:ServiceTask"> = {
   retryCounter: "3"
 };
+const processProperties: ElementProperties<"bpmn:Process"> = {
+  modelerTemplate: "example-template"
+};
+void processProperties;
 
 // @ts-expect-error Zeebe traits extend concrete BPMN elements and are not creatable.
 const trait: SupportedElementType = "zeebe:ZeebeServiceTask";

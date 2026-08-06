@@ -60,6 +60,11 @@ try {
   assert.equal(files.includes("dist/index.js"), true);
   assert.equal(files.includes("dist/index.d.ts"), true);
   assert.equal(files.includes("dist/bpmn-moddle.d.ts"), true);
+  assert.equal(files.includes("dist/model-types.generated/bpmn.d.ts"), true);
+  assert.equal(files.includes("dist/model-types.generated/bpmndi.d.ts"), true);
+  assert.equal(files.includes("dist/model-types.generated/dc.d.ts"), true);
+  assert.equal(files.includes("dist/model-types.generated/di.d.ts"), true);
+  assert.equal(files.includes("dist/model-types.generated/zeebe.d.ts"), true);
 
   const consumerJavaScript = join(consumerRoot, "consumer.mjs");
   const consumerTypeScript = join(consumerRoot, "consumer.ts");
@@ -71,9 +76,15 @@ if (typeof BpmnModel !== "function") throw new Error("BpmnModel export missing")
   );
   await writeFile(
     consumerTypeScript,
-    `import { BpmnModel, type PublishOptions } from "@philippfromme/bpmn-cli";
+    `import {
+  BpmnModel,
+  type ElementProperties,
+  type PublishOptions
+} from "@philippfromme/bpmn-cli";
 const options: PublishOptions = { layout: "none" };
+const task: ElementProperties<"bpmn:ServiceTask"> = { retryCounter: "3" };
 void options;
+void task;
 void BpmnModel.create;`,
     "utf8"
   );

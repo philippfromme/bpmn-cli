@@ -1,134 +1,225 @@
-import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import { spawn } from "node:child_process";
 
 const require = createRequire(import.meta.url);
 const root = resolve(import.meta.dirname, "..");
-const output = resolve(root, "src", "model-types.generated.ts");
-const descriptors = [
-  require.resolve("bpmn-moddle/resources/bpmn/json/bpmn.json"),
-  require.resolve("bpmn-moddle/resources/bpmn/json/bpmndi.json"),
-  require.resolve("bpmn-moddle/resources/bpmn/json/dc.json"),
-  require.resolve("bpmn-moddle/resources/bpmn/json/di.json"),
-  require.resolve("zeebe-bpmn-moddle/resources/zeebe.json")
+const generatedDirectory = resolve(root, "src", "model-types.generated");
+const adapterOutput = resolve(root, "src", "model-types.generated.ts");
+const checkDirectory = resolve(root, ".model-types-generated-check");
+const descriptorDefinitions = [
+  {
+    name: "bpmn",
+    path: require.resolve("bpmn-moddle/resources/bpmn/json/bpmn.json")
+  },
+  {
+    name: "bpmndi",
+    path: require.resolve("bpmn-moddle/resources/bpmn/json/bpmndi.json")
+  },
+  {
+    name: "dc",
+    path: require.resolve("bpmn-moddle/resources/bpmn/json/dc.json")
+  },
+  {
+    name: "di",
+    path: require.resolve("bpmn-moddle/resources/bpmn/json/di.json")
+  },
+  {
+    name: "zeebe",
+    path: require.resolve("zeebe-bpmn-moddle/resources/zeebe.json")
+  }
 ];
 
-const primitiveTypes = new Map([
-  ["Boolean", "boolean"],
-  ["Integer", "number"],
-  ["Real", "number"],
-  ["String", "string"]
-]);
-
-function propertyType(property) {
-  const base = primitiveTypes.get(property.type) ?? "ModdleElement";
-  return property.isMany ? `readonly ${base}[]` : base;
-}
-
-function propertyDeclaration(property) {
-  const key = JSON.stringify(property.name);
-  return `    readonly ${key}?: ${propertyType(property)};`;
-}
-
-const sources = await Promise.all(descriptors.map((path) => readFile(path, "utf8")));
-const digest = createHash("sha256").update(sources.join("\n")).digest("hex");
-const packages = sources.map((source) => JSON.parse(source));
-const allTypeEntries = packages
-  .flatMap((descriptor) =>
-    descriptor.types.map((type) => ({
-      prefix: descriptor.prefix,
-      type
-    }))
-  );
-const typesByName = new Map(
-  allTypeEntries.map((entry) => [`${entry.prefix}:${entry.type.name}`, entry])
+const descriptorSources = await Promise.all(
+  descriptorDefinitions.map(async (definition) => ({
+    ...definition,
+    descriptor: JSON.parse(await readFile(definition.path, "utf8"))
+  }))
 );
 
-function inheritedProperties(entry, visited = new Set()) {
-  const typeName = `${entry.prefix}:${entry.type.name}`;
-  if (visited.has(typeName)) {
-    return [];
+function pascal(value) {
+  return `${value[0]?.toUpperCase() ?? ""}${value.slice(1)}`;
+}
+
+function elementTypeName(descriptor, type) {
+  return `${descriptor.prefix}:${type.name}`;
+}
+
+function adapterContents() {
+  const constructibleTypes = descriptorSources
+    .flatMap(({ descriptor }) =>
+      descriptor.types
+        .filter(
+          (type) =>
+            !type.isAbstract &&
+            (!Array.isArray(type.extends) || type.extends.length === 0)
+        )
+        .map((type) => elementTypeName(descriptor, type))
+    )
+    .sort((left, right) => left.localeCompare(right));
+  const traitExtensions = new Map();
+  const traitImports = new Map();
+
+  for (const { descriptor, name } of descriptorSources) {
+    for (const type of descriptor.types) {
+      if (!type.extends) {
+        continue;
+      }
+
+      const interfaceName = `${pascal(descriptor.prefix)}${type.name}`;
+      const module = `./model-types.generated/${name}.js`;
+
+      traitImports.set(interfaceName, module);
+
+      for (const extendedType of type.extends) {
+        const target = extendedType.includes(":")
+          ? extendedType
+          : `${descriptor.prefix}:${extendedType}`;
+        const traits = traitExtensions.get(target) ?? [];
+
+        traits.push(interfaceName);
+        traitExtensions.set(target, traits);
+      }
+    }
   }
-  visited.add(typeName);
 
-  const inherited = (entry.type.superClass ?? []).flatMap((superType) => {
-    const name = superType.includes(":")
-      ? superType
-      : `${entry.prefix}:${superType}`;
-    const parent = typesByName.get(name);
-    return parent === undefined ? [] : inheritedProperties(parent, visited);
-  });
-  const properties = [...inherited, ...(entry.type.properties ?? [])];
-  return [...new Map(properties.map((property) => [property.name, property])).values()];
+  const mapImports = descriptorSources
+    .map(
+      ({ descriptor, name }) =>
+        `import type { ${pascal(descriptor.prefix)}ModdleTypeMap } from "./model-types.generated/${name}.js";`
+    )
+    .join("\n");
+  const traitImportLines = [...traitImports]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(
+      ([interfaceName, module]) =>
+        `import type { ${interfaceName} } from "${module}";`
+    )
+    .join("\n");
+  const traitProperties = [...traitExtensions]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(
+      ([type, traits]) =>
+        `  ${JSON.stringify(type)}: ${traits.sort().join(" & ")};`
+    )
+    .join("\n");
+
+  return `// This file is generated by scripts/generate-model-types.mjs. Do not edit.
+// Descriptor declarations are generated by @bpmn-io/moddle-types-generator.
+
+import type { ModdleElement } from "moddle";
+${mapImports}
+${traitImportLines ? `\n${traitImportLines}` : ""}
+
+export interface ModdleTypeMap extends ${descriptorSources
+    .map(({ descriptor }) => `${pascal(descriptor.prefix)}ModdleTypeMap`)
+    .join(", ")} {}
+
+type ConstructibleModdleTypeMap = Pick<ModdleTypeMap,
+${constructibleTypes.map((type) => `  | ${JSON.stringify(type)}`).join("\n")}
+>;
+
+export type SupportedElementType = keyof ConstructibleModdleTypeMap;
+type PropertiesFromMap<Type extends SupportedElementType> =
+  Omit<ConstructibleModdleTypeMap[Type], keyof ModdleElement<object>>;
+interface TraitProperties {
+${traitProperties}
 }
+type TraitFields<Type extends SupportedElementType> =
+  Type extends keyof TraitProperties ? TraitProperties[Type] : unknown;
 
-function extendedProperties(entry) {
-  const typeName = `${entry.prefix}:${entry.type.name}`;
-  const traits = allTypeEntries.filter((candidate) =>
-    (candidate.type.extends ?? []).some((extendedType) => {
-      const name = extendedType.includes(":")
-        ? extendedType
-        : `${candidate.prefix}:${extendedType}`;
-      return name === typeName;
-    })
-  );
+export type ElementProperties<Type extends SupportedElementType> =
+  PropertiesFromMap<Type> & TraitFields<Type>;
 
-  return traits.flatMap((trait) => inheritedProperties(trait));
-}
-
-const typeEntries = allTypeEntries
-  .filter(
-    ({ type }) =>
-      !type.isAbstract &&
-      (!Array.isArray(type.extends) || type.extends.length === 0)
-  )
-  .map((entry) => ({
-    ...entry,
-    properties: [
-      ...new Map(
-        [...inheritedProperties(entry), ...extendedProperties(entry)]
-          .map((property) => [property.name, property])
-      ).values()
-    ]
-  }))
-  .sort(({ prefix: leftPrefix, type: left }, { prefix: rightPrefix, type: right }) =>
-    `${leftPrefix}:${left.name}`.localeCompare(`${rightPrefix}:${right.name}`)
-  );
-
-const contents = `// This file is generated by scripts/generate-model-types.mjs. Do not edit.
-// Descriptor SHA-256: ${digest}
-
-import type { ModdleElement } from "bpmn-moddle";
-
-export interface ModdleTypeMap {
-${typeEntries.map(({ prefix, properties, type }) => `  ${JSON.stringify(`${prefix}:${type.name}`)}: ${properties.length === 0
-  ? "Record<never, never>"
-  : `{\n${properties.map(propertyDeclaration).join("\n")}\n  }`};`).join("\n")}
-}
-
-export type SupportedElementType = keyof ModdleTypeMap;
-export type ElementProperties<Type extends SupportedElementType> = ModdleTypeMap[Type];
 export const supportedElementTypes = [
-${typeEntries.map(({ prefix, type }) => `  ${JSON.stringify(`${prefix}:${type.name}`)},`).join("\n")}
+${constructibleTypes.map((type) => `  ${JSON.stringify(type)},`).join("\n")}
 ] as const satisfies readonly SupportedElementType[];
 `;
+}
 
-if (process.argv.includes("--check")) {
-  let existing;
+function runGenerator(destination, quiet = false) {
+  const generator = resolve(
+    root,
+    "node_modules",
+    "@bpmn-io",
+    "moddle-types-generator",
+    "bin",
+    "generate-types.js"
+  );
+  const arguments_ = [
+    "--index",
+    resolve(destination, "index.d.ts"),
+    ...descriptorSources.flatMap(({ name, path }) => [
+      path,
+      resolve(destination, `${name}.d.ts`)
+    ])
+  ];
+
+  return new Promise((resolveRun, rejectRun) => {
+    const child = spawn(process.execPath, [generator, ...arguments_], {
+      stdio: quiet ? "ignore" : "inherit"
+    });
+
+    child.once("error", rejectRun);
+    child.once("exit", (code) => {
+      if (code === 0) {
+        resolveRun();
+      } else {
+        rejectRun(
+          new Error(`moddle-generate-types exited with status ${code ?? "unknown"}.`)
+        );
+      }
+    });
+  });
+}
+
+async function verifyGeneratedFiles() {
+  await rm(checkDirectory, { force: true, recursive: true });
 
   try {
-    existing = await readFile(output, "utf8");
-  } catch {
-    process.exitCode = 1;
-    process.stderr.write("Generated model types are missing. Run npm run generate:types.\\n");
-    process.exit();
-  }
+    await runGenerator(checkDirectory, true);
 
-  if (existing !== contents) {
-    process.exitCode = 1;
-    process.stderr.write("Generated model types are stale. Run npm run generate:types.\\n");
+    const files = [
+      ...descriptorDefinitions.map(({ name }) => `${name}.d.ts`),
+      "index.d.ts"
+    ];
+    const stale = [];
+
+    for (const file of files) {
+      const [expected, existing] = await Promise.all([
+        readFile(resolve(checkDirectory, file), "utf8"),
+        readFile(resolve(generatedDirectory, file), "utf8").catch(() => undefined)
+      ]);
+
+      if (existing !== expected) {
+        stale.push(`src/model-types.generated/${file}`);
+      }
+    }
+
+    const expectedAdapter = adapterContents();
+    const existingAdapter = await readFile(adapterOutput, "utf8").catch(
+      () => undefined
+    );
+
+    if (existingAdapter !== expectedAdapter) {
+      stale.push("src/model-types.generated.ts");
+    }
+
+    if (stale.length > 0) {
+      process.exitCode = 1;
+      process.stderr.write(
+        `Generated model types are stale: ${stale.join(", ")}. Run npm run generate:types.\n`
+      );
+    }
+  } finally {
+    await rm(checkDirectory, { force: true, recursive: true });
   }
+}
+
+if (process.argv.includes("--check")) {
+  await verifyGeneratedFiles();
 } else {
-  await writeFile(output, contents, "utf8");
+  await runGenerator(generatedDirectory);
+  await writeFile(adapterOutput, adapterContents(), "utf8");
 }

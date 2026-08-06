@@ -6,7 +6,7 @@ export default tseslint.config(
     ignores: ["dist/", "src/model-types.generated/"]
   },
   {
-    files: ["examples/**/*.mjs"],
+    files: ["examples/**/*.mjs", "scripts/**/*.mjs"],
     languageOptions: {
       globals: {
         console: "readonly",

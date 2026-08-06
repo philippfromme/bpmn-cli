@@ -159,7 +159,7 @@ unsupported extension data rather than silently dropping it.
 ```ts
 await model.write({
   output: "edited.bpmn", // required for Bpmn.create()
-  layout: "auto",        // default; use "none" to preserve imported DI
+  layout: "auto",        // default; regenerate Diagram Interchange
   validate: true,        // default
   force: false           // default; refuses replacement
 });
@@ -167,7 +167,10 @@ await model.write({
 
 Write results include output and semantic hashes plus semantic change
 information. Presentation-only Diagram Interchange does not affect semantic
-hashes.
+hashes. Use `layout: "none"` to skip `bpmn-auto-layout`: existing Diagram
+Interchange is preserved unchanged, and a model without Diagram Interchange
+remains without it. Use the default `layout: "auto"` for generated models that
+need a deterministic diagram.
 
 ## Examples
 
@@ -183,6 +186,11 @@ The executable examples cover the main supported scenarios:
 npm run build
 node examples/straight-through-service-flow.mjs generated-flow.bpmn
 ```
+
+For a concise, agent-facing operating guide, see
+[`examples/agent-skill/SKILL.md`](examples/agent-skill/SKILL.md). It is a
+reference skill to adapt for an agent platform; installing this package does
+not automatically activate it.
 
 ## Verification
 

@@ -36,7 +36,7 @@
     "generate:types": "node scripts/generate-model-types.mjs",
     "prepare": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src examples",
+    "lint": "eslint src examples scripts",
     "package:check": "npm run build && node scripts/check-package.mjs",
     "prepack": "npm run build",
     "test": "npm run build:test && node --test \"dist/*.test.js\" && npm run package:check",

@@ -411,6 +411,16 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
     );
   }
 
+  createChild<ChildType extends SupportedElementType>(
+    property: string,
+    type: ChildType,
+    properties: ElementPropertiesInput<ChildType> & { id?: string }
+  ): ModelElement<ChildType> {
+    const child = this.model.create(type, properties);
+    this.model.append(this, child, property);
+    return child;
+  }
+
   configureForm(configuration: FormConfiguration): this {
     if (!this.raw.$instanceOf("bpmn:UserTask")) {
       throw new ModelApiError(

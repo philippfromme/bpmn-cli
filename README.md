@@ -1,12 +1,58 @@
 # bpmn-sdk
 
 `bpmn-sdk` is a TypeScript library for creating and safely editing BPMN 2.0
-and Camunda 8 / Zeebe models. Applications and generator scripts import the
-library, build or edit a model, then write verified BPMN XML.
+and Camunda 8 / Zeebe models. It lets generator scripts and applications work
+with BPMN semantics and exact element IDs instead of manipulating XML, then
+writes verified BPMN XML.
 
-`Bpmn` is the single public entry point to one parser, descriptor resolver,
-mutation kernel, layout engine, semantic verifier, and atomic output path.
-Use it for concise generators and exact-ID editing alike.
+Use it when your code must generate a process, make a deliberate change to an
+existing model, or safely persist a BPMN file. `Bpmn` is the single public
+entry point for fluent construction, exact-ID editing, descriptor-backed
+validation, deterministic layout, semantic verification, and atomic output.
+
+## Why bpmn-sdk?
+
+- **Work with BPMN, not XML.** Create topology, configure Zeebe extensions,
+  and target existing elements through typed APIs and exact IDs.
+- **Keep changes deliberate.** Topology, joins, loop targets, branch
+  conditions, and default flows are explicit; the SDK does not infer them.
+- **Write without silent corruption.** Before a file is replaced, `write()`
+  serializes, reloads, verifies semantics, and writes atomically. It rejects
+  ambiguous IDs, invalid containment or connections, and unsupported extension
+  data.
+
+It is a higher-level safety layer over `bpmn-moddle`, not a replacement for
+the BPMN or Zeebe moddle descriptors.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  bpmnModdle[bpmn-moddle]
+  bpmnDescriptor[BPMN model descriptor]
+  zeebeModdle[zeebe-bpmn-moddle]
+  zeebeDescriptor[Zeebe BPMN model descriptor]
+  generator["@bpmn-io/moddle-types-generator"]
+  declarations["Generated TypeScript declarations"]
+  sdk[bpmn-sdk]
+  layout[bpmn-auto-layout]
+
+  bpmnModdle -. provides .-> bpmnDescriptor
+  zeebeModdle -. provides .-> zeebeDescriptor
+  bpmnDescriptor --> generator
+  zeebeDescriptor --> generator
+  generator --> declarations --> sdk
+  bpmnModdle --> sdk
+  zeebeModdle --> sdk
+  layout --> sdk
+```
+
+`bpmn-sdk` builds on `bpmn-moddle` and ships with the Zeebe descriptor profile
+enabled by default. At SDK build time, the bundled BPMN and Zeebe descriptors
+produce the TypeScript declarations used by its typed API. At runtime,
+`bpmn-moddle` and the enabled Zeebe profile parse, create, validate, and
+serialize model elements; applications importing the package do not run the
+type generator.
 
 ## Install
 

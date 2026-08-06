@@ -11,6 +11,9 @@ export {
   type ScalarProperties
 } from "./model.js";
 export {
+  descriptorPropertyClassifications,
+  getDescriptorPropertyClassification,
+  type DescriptorPropertyClassification,
   type ElementProperties,
   type SupportedElementType,
   type TypedModdleElement

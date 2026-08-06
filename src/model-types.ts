@@ -1,13 +1,19 @@
 import type { BpmnModdle, ModdleElement } from "bpmn-moddle";
 
 import {
+  descriptorPropertyClassifications,
+  getDescriptorPropertyClassification,
   supportedElementTypes,
+  type DescriptorPropertyClassification,
   type ElementProperties,
   type SupportedElementType
 } from "./model-types.generated.js";
 
 export {
+  descriptorPropertyClassifications,
+  getDescriptorPropertyClassification,
   supportedElementTypes,
+  type DescriptorPropertyClassification,
   type ElementProperties,
   type SupportedElementType
 };

@@ -5,6 +5,7 @@ import type {
   ModdlePropertyDescriptor
 } from "bpmn-moddle";
 
+import { getDescriptorPropertyClassification } from "./model-types.js";
 import { typedDescriptorProperties } from "./moddle.js";
 
 export type JsonPrimitive = boolean | number | string | null;
@@ -87,6 +88,25 @@ function qualifiedPropertyName(
   );
 }
 
+function definingType(property: ModdlePropertyDescriptor): string {
+  if (!("definedBy" in property)) {
+    return "";
+  }
+
+  const { definedBy } = property;
+
+  if (
+    typeof definedBy !== "object" ||
+    definedBy === null ||
+    !("name" in definedBy) ||
+    typeof definedBy.name !== "string"
+  ) {
+    return "";
+  }
+
+  return definedBy.name;
+}
+
 export function classifyProperty(
   element: ModdleElement,
   property: ModdlePropertyDescriptor,
@@ -103,18 +123,24 @@ export function classifyProperty(
     return "exclude";
   }
 
-  if (property.isReference) {
+  const classification = getDescriptorPropertyClassification(
+    definingType(property),
+    property.name
+  );
+
+  if (classification === "presentation") {
+    return "exclude";
+  }
+
+  if (classification === "reference" || property.isReference) {
     return "reference";
   }
 
-  const primitiveTypes = new Set([
-    "Boolean",
-    "Integer",
-    "Real",
-    "String"
-  ]);
-
-  return primitiveTypes.has(property.type) ? "primitive" : "semantic-child";
+  return classification === "scalar" ||
+    property.isAttr ||
+    ["Boolean", "Integer", "Real", "String"].includes(property.type)
+    ? "primitive"
+    : "semantic-child";
 }
 
 function referenceValue(

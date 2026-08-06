@@ -106,3 +106,16 @@ test("rejects incomplete and ambiguous branch declarations", async () => {
       error.code === "UNFINISHED_BRANCH"
   );
 });
+
+test("adds explicit parallel gateway nodes through the fluent builder", async () => {
+  const process = await Bpmn.createProcess("parallel-flow");
+  const model = process
+    .startEvent("start")
+    .parallelGateway("split")
+    .parallelGateway("join")
+    .endEvent("done")
+    .build();
+
+  assert.equal(model.element("split").type, "bpmn:ParallelGateway");
+  assert.equal(model.element("join").type, "bpmn:ParallelGateway");
+});

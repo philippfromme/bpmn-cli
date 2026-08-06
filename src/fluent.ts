@@ -29,6 +29,7 @@ export interface UserTaskOptions extends NodeOptions {
 type FlowNodeType =
   | "bpmn:EndEvent"
   | "bpmn:ExclusiveGateway"
+  | "bpmn:ParallelGateway"
   | "bpmn:ServiceTask"
   | "bpmn:StartEvent"
   | "bpmn:UserTask";
@@ -265,6 +266,10 @@ export class ProcessBuilder {
 
   exclusiveGateway(id: string, options: NodeOptions = {}): this {
     return this.addNode("bpmn:ExclusiveGateway", id, options);
+  }
+
+  parallelGateway(id: string, options: NodeOptions = {}): this {
+    return this.addNode("bpmn:ParallelGateway", id, options);
   }
 
   endEvent(id: string, options: NodeOptions = {}): this {

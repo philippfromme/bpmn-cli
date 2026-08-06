@@ -68,3 +68,36 @@ test("round-trips BPMN and Zeebe semantics from every blueprint fixture", async 
     }
   });
 });
+
+test("edits nested Zeebe properties in a representative blueprint fixture", async () => {
+  await withTemporaryDirectory("bpmn-blueprint-edit", async (directory) => {
+    const source = await copyBpmnAndZeebeFixture(
+      join(fixtureDirectory, "blueprint.ai-email-support-agent.bpmn"),
+      directory
+    );
+    const output = join(directory, "edited.bpmn");
+    const model = await BpmnModel.open(source);
+    const task = model.element<"bpmn:ServiceTask">("Reply_with_email_to_customer");
+    const extensions = task.child("extensionElements");
+    const definition = extensions
+      .children<"zeebe:TaskDefinition">("values")
+      .find((element) => element.type === "zeebe:TaskDefinition");
+
+    assert.ok(definition, "fixture task must have a Zeebe task definition");
+    task.setName("Send customer reply");
+    definition.setProperties({ retries: "5" });
+    await model.publish({ layout: "none", output });
+
+    const reopened = await BpmnModel.open(output);
+    const editedTask = reopened.element<"bpmn:ServiceTask">(
+      "Reply_with_email_to_customer"
+    );
+    const editedDefinition = editedTask
+      .child("extensionElements")
+      .children<"zeebe:TaskDefinition">("values")
+      .find((element) => element.type === "zeebe:TaskDefinition");
+
+    assert.equal(editedTask.name, "Send customer reply");
+    assert.equal(editedDefinition?.raw.get("retries"), "5");
+  });
+});

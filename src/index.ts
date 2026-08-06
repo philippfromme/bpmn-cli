@@ -28,7 +28,17 @@ export {
   BranchBuilder,
   ProcessBuilder,
   ProcessBuilderError,
+  type AdHocSubProcessOptions,
+  type ErrorReference,
+  type EscalationReference,
+  type EventDefinition,
+  type LoopFlowOptions,
+  type MultiInstanceLoopOptions,
+  type MessageReference,
   type NodeOptions,
   type ProcessOptions,
-  type ServiceTaskOptions
+  type ServiceTaskOptions,
+  type SignalReference,
+  type StandardLoopOptions,
+  type TimerEventOptions
 } from "./fluent.js";

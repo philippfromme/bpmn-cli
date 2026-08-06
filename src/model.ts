@@ -139,15 +139,14 @@ function isSequenceFlowEndpoint(element: ModdleElement): boolean {
 }
 
 function isScalarProperty(property: {
+  isAttr?: boolean;
   isMany?: boolean;
   isReference?: boolean;
-  type: string;
+  name: string;
 }): boolean {
-  return (
-    property.isMany !== true &&
+  return property.isMany !== true &&
     property.isReference !== true &&
-    ["Boolean", "Integer", "Real", "String"].includes(property.type)
-  );
+    property.isAttr === true;
 }
 
 function isManagedReciprocalReference(property: string): boolean {
@@ -711,6 +710,15 @@ export class BpmnModel {
     return process;
   }
 
+  rootElement<Type extends SupportedElementType>(
+    type: Type,
+    properties: ElementPropertiesInput<Type> & { id?: string }
+  ): ModelElement<Type> {
+    const element = this.create(type, properties);
+    this.append(this.editable.definitions, element, "rootElements");
+    return element;
+  }
+
   append(
     parent: ModdleElement | ModelElement,
     child: ModdleElement | ModelElement,
@@ -792,6 +800,36 @@ export class BpmnModel {
     this.addReciprocal(sourceElement.raw, "outgoing", flow.raw);
     this.addReciprocal(targetElement.raw, "incoming", flow.raw);
     return flow;
+  }
+
+  setDefaultFlow(
+    gateway: string | ModelElement<"bpmn:ExclusiveGateway" | "bpmn:InclusiveGateway">,
+    flow: string | ModelElement<"bpmn:SequenceFlow">
+  ): void {
+    const selectedGateway = typeof gateway === "string"
+      ? this.element<"bpmn:ExclusiveGateway" | "bpmn:InclusiveGateway">(gateway)
+      : gateway;
+    const selectedFlow = typeof flow === "string"
+      ? this.element<"bpmn:SequenceFlow">(flow)
+      : flow;
+    this.assertOwnedWrapper(selectedGateway);
+    this.assertOwnedWrapper(selectedFlow);
+
+    if (
+      !(
+        selectedGateway.raw.$instanceOf("bpmn:ExclusiveGateway") ||
+        selectedGateway.raw.$instanceOf("bpmn:InclusiveGateway")
+      ) ||
+      selectedFlow.raw.$parent !== selectedGateway.raw.$parent ||
+      selectedFlow.raw.get("sourceRef") !== selectedGateway.raw
+    ) {
+      throw new ModelApiError(
+        "INVALID_CONNECTION",
+        "A gateway default flow must be an outgoing SequenceFlow in the same container"
+      );
+    }
+
+    selectedGateway.raw.set("default", selectedFlow.raw);
   }
 
   rewire(

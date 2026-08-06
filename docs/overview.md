@@ -31,11 +31,43 @@ await process
   .publish({ output: "approval-flow.bpmn" });
 ```
 
-Every branch must begin with `condition(expression)` or `defaultFlow()` and
-end with `endEvent()`. `build()` returns the underlying `BpmnModel` when a
-script needs the lower-level exact-ID API before publication. `publish()`
-retains the standard validation, deterministic auto-layout, semantic
-verification, and atomic-output behavior.
+Exclusive and inclusive branches must begin with `condition(expression)` or
+`defaultFlow()` and end with `endEvent()` or `join()`. `build()` returns the
+underlying `BpmnModel` when a script needs the lower-level exact-ID API before
+publication. `publish()` retains the standard validation, deterministic
+auto-layout, semantic verification, and atomic-output behavior.
+
+## Branch joins, events, and loops
+
+Splits are joined only through an explicit join declaration. Branches that
+continue must call `join()`, followed by the selected gateway join; branches
+that end use `endEvent()` instead.
+
+```ts
+process
+  .startEvent("start")
+  .parallelGateway("split")
+  .branch("a", (branch) => branch.userTask("a").join())
+  .branch("b", (branch) => branch.userTask("b").join())
+  .parallelJoin("join")
+  .timerCatchEvent("wait", { duration: "PT5M" })
+  .endEvent("done");
+```
+
+`inclusiveGateway`, `eventBasedGateway`, `parallelJoin`, `inclusiveJoin`, and
+`exclusiveJoin` model the corresponding BPMN gateways. Event-based branches
+must begin with `catchEvent`. Use `catchEvent` and `throwEvent` with typed
+timer, message, error, escalation, signal, or link definitions, or the
+corresponding convenience methods such as `timerCatchEvent` and
+`errorEndEvent`. Message, error, escalation, and signal references are
+root BPMN elements created or reused by their exact IDs.
+
+Use `loop(targetId)` for an explicit graph back-edge,
+`standardLoop(options)` or `multiInstanceLoop(options)` for BPMN activity loop
+characteristics, and `subProcess` or `adHocSubProcess` for subprocess nodes.
+`boundary(id, definition, handler)` attaches a typed boundary event to the
+current activity while keeping the main-flow cursor unchanged; the handler
+must end explicitly.
 
 ## Open and change an existing model
 

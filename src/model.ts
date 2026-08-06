@@ -369,6 +369,48 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
     return this;
   }
 
+  child<ChildType extends SupportedElementType = SupportedElementType>(
+    property: string
+  ): ModelElement<ChildType> {
+    const descriptor = typedDescriptorProperties(this.raw).find(
+      (candidate) => candidate.name === property
+    );
+    const child = asElements([this.raw.get(property)])[0];
+    if (
+      descriptor === undefined ||
+      descriptor.isReference === true ||
+      descriptor.isMany === true ||
+      child === undefined
+    ) {
+      throw new ModelApiError(
+        "INVALID_PROPERTY",
+        `${this.type}.${property} is not an accessible contained child`
+      );
+    }
+    return this.model.wrap(child as TypedModdleElement<ChildType>);
+  }
+
+  children<ChildType extends SupportedElementType = SupportedElementType>(
+    property: string
+  ): ModelElement<ChildType>[] {
+    const descriptor = typedDescriptorProperties(this.raw).find(
+      (candidate) => candidate.name === property
+    );
+    if (
+      descriptor === undefined ||
+      descriptor.isReference === true ||
+      descriptor.isMany !== true
+    ) {
+      throw new ModelApiError(
+        "INVALID_PROPERTY",
+        `${this.type}.${property} is not an accessible contained child list`
+      );
+    }
+    return asElements(this.raw.get(property)).map((child) =>
+      this.model.wrap(child as TypedModdleElement<ChildType>)
+    );
+  }
+
   configureForm(configuration: FormConfiguration): this {
     if (!this.raw.$instanceOf("bpmn:UserTask")) {
       throw new ModelApiError(

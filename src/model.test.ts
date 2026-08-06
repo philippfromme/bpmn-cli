@@ -200,6 +200,23 @@ test("sets descriptor-backed references by exact target ID", async () => {
   );
 });
 
+test("accesses contained extension elements through an exact-ID owner", async () => {
+  const model = await BpmnModel.create();
+  const process = model.process();
+  const task = model.create("bpmn:ServiceTask", {});
+  model.append(process, task, "flowElements");
+  task.extensions.ensure("zeebe:TaskDefinition").raw.set("type", "before");
+
+  const extensionElements = task.child("extensionElements");
+  const [taskDefinition] = extensionElements.children("values");
+  assert.ok(taskDefinition);
+
+  taskDefinition.setProperties({ type: "after" });
+
+  assert.equal(taskDefinition.raw.get("type"), "after");
+  expectModelError("INVALID_PROPERTY", () => task.child("outgoing"));
+});
+
 test("rejects wrappers from another model without mutating either graph", async () => {
   const firstModel = await BpmnModel.create();
   const firstProcess = firstModel.process();

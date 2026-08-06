@@ -31,6 +31,16 @@ void invalidScalarProperties;
 const invalidReferenceProperties: GatewayReferenceProperties = { outgoing: [] };
 void invalidReferenceProperties;
 
+type BoundaryEventReferenceProperties = Parameters<
+  ModelElement<"bpmn:BoundaryEvent">["setReferences"]
+>[0];
+
+const invalidBoundaryReferences: BoundaryEventReferenceProperties = {
+  // @ts-expect-error Boundary attachment requires attachBoundaryEvent().
+  attachedToRef: "Task_1"
+};
+void invalidBoundaryReferences;
+
 const zeebeFixture = fileURLToPath(
   new URL("../test/fixtures/AI Email Support Agent.bpmn", import.meta.url)
 );
@@ -144,6 +154,35 @@ test("maintains sequence-flow reciprocal references while rewiring and removing"
   model.remove(flow);
   assert.deepEqual(first.raw.outgoing, []);
   assert.deepEqual(replacement.raw.incoming, []);
+});
+
+test("attaches and reattaches boundary events through a dedicated operation", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const output = join(directory, "boundary-event.bpmn");
+    const model = await BpmnModel.create();
+    const process = model.process();
+    const firstTask = model.create("bpmn:ServiceTask", {});
+    const secondTask = model.create("bpmn:ServiceTask", {});
+    const boundary = model.create("bpmn:BoundaryEvent", {});
+    model.append(process, firstTask, "flowElements");
+    model.append(process, secondTask, "flowElements");
+    model.append(process, boundary, "flowElements");
+
+    model.attachBoundaryEvent(boundary, firstTask);
+    assert.equal(boundary.raw.get("attachedToRef"), firstTask.raw);
+    assert.deepEqual(firstTask.raw.get("boundaryEventRefs"), [boundary.raw]);
+
+    model.attachBoundaryEvent(boundary.id, secondTask.id);
+    assert.deepEqual(firstTask.raw.get("boundaryEventRefs"), []);
+    assert.deepEqual(secondTask.raw.get("boundaryEventRefs"), [boundary.raw]);
+
+    await model.publish({ layout: "none", output, validate: true });
+    const reopened = await BpmnModel.open(output);
+    assert.equal(
+      reopened.element(boundary.id).raw.get("attachedToRef"),
+      reopened.element(secondTask.id).raw
+    );
+  });
 });
 
 test("reserves generated IDs for unattached elements", async () => {

@@ -60,7 +60,13 @@ export type ScalarProperties<Type extends SupportedElementType> = Partial<Pick<
 
 type ReferencePropertyKeys<Properties> = {
   [Property in keyof Properties]:
-    Property extends "incoming" | "outgoing" | "sourceRef" | "targetRef"
+    Property extends
+      | "attachedToRef"
+      | "boundaryEventRefs"
+      | "incoming"
+      | "outgoing"
+      | "sourceRef"
+      | "targetRef"
       ? never
       : NonNullable<Properties[Property]> extends
           | DescriptorModdleElement<object>
@@ -126,6 +132,8 @@ function isScalarProperty(property: {
 
 function isManagedReciprocalReference(property: string): boolean {
   return (
+    property === "attachedToRef" ||
+    property === "boundaryEventRefs" ||
     property === "incoming" ||
     property === "outgoing" ||
     property === "sourceRef" ||
@@ -774,6 +782,51 @@ export class BpmnModel {
     return sequenceFlow;
   }
 
+  attachBoundaryEvent(
+    boundaryEvent: string | ModelElement<"bpmn:BoundaryEvent">,
+    activity: string | ModelElement
+  ): ModelElement<"bpmn:BoundaryEvent"> {
+    const boundary = typeof boundaryEvent === "string"
+      ? this.element<"bpmn:BoundaryEvent">(boundaryEvent)
+      : boundaryEvent;
+    const attachedActivity = typeof activity === "string"
+      ? this.element(activity)
+      : activity;
+    this.assertOwnedWrapper(boundary);
+    this.assertOwnedWrapper(attachedActivity);
+
+    if (
+      !attachedActivity.raw.$instanceOf("bpmn:Activity") ||
+      boundary.raw.$parent === undefined ||
+      boundary.raw.$parent !== attachedActivity.raw.$parent
+    ) {
+      throw new ModelApiError(
+        "INVALID_CONNECTION",
+        "BoundaryEvent and attached activity must share a flow-elements container"
+      );
+    }
+
+    const previousActivity = boundary.raw.get("attachedToRef");
+    if (
+      previousActivity instanceof Object &&
+      "$type" in previousActivity &&
+      previousActivity !== attachedActivity.raw
+    ) {
+      this.removeReciprocal(
+        previousActivity as ModdleElement,
+        "boundaryEventRefs",
+        boundary.raw
+      );
+    }
+    boundary.raw.set("attachedToRef", attachedActivity.raw);
+    this.addReciprocal(
+      attachedActivity.raw,
+      "boundaryEventRefs",
+      boundary.raw
+    );
+    return boundary;
+  }
+
   remove(element: string | ModelElement): void {
     const selected = typeof element === "string" ? this.element(element) : element;
     this.assertOwnedWrapper(selected);
@@ -889,7 +942,7 @@ export class BpmnModel {
 
   private addReciprocal(
     element: ModdleElement,
-    property: "incoming" | "outgoing",
+    property: "boundaryEventRefs" | "incoming" | "outgoing",
     flow: ModdleElement
   ): void {
     const values = asElements(element.get(property));
@@ -900,7 +953,7 @@ export class BpmnModel {
 
   private removeReciprocal(
     element: ModdleElement,
-    property: "incoming" | "outgoing",
+    property: "boundaryEventRefs" | "incoming" | "outgoing",
     flow: ModdleElement
   ): void {
     element.set(

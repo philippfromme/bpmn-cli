@@ -7,12 +7,22 @@ import { fileURLToPath } from "node:url";
 
 import { BpmnModel, ModelApiError } from "./index.js";
 import { ModelLoadError } from "./model-loader.js";
+import type { ModelElement } from "./model.js";
 import { ModelPublicationError } from "./model-runtime.js";
 import { loadSemanticModel } from "./model-loader.js";
+import { expectModelError } from "./test-support.test.js";
 import {
   isSupportedElementType,
   type ElementProperties
 } from "./model-types.js";
+
+type ServiceTaskScalarProperties = Parameters<
+  ModelElement<"bpmn:ServiceTask">["setProperties"]
+>[0];
+
+// @ts-expect-error Incoming sequence flows are references, not scalar properties.
+const invalidScalarProperties: ServiceTaskScalarProperties = { incoming: [] };
+void invalidScalarProperties;
 
 const zeebeFixture = fileURLToPath(
   new URL("../test/fixtures/AI Email Support Agent.bpmn", import.meta.url)
@@ -138,6 +148,26 @@ test("reserves generated IDs for unattached elements", async () => {
 
   assert.equal(deferred.id, "Task_1");
   assert.equal(later.id, "Task_2");
+});
+
+test("sets only descriptor-backed scalar properties on exact-ID elements", async () => {
+  const model = await BpmnModel.create();
+  const process = model.process();
+  const task = model.create("bpmn:ServiceTask", {});
+  model.append(process, task, "flowElements");
+
+  task.setProperties({
+    implementation: "delegate",
+    name: "Review application",
+    retryCounter: "3"
+  });
+
+  assert.equal(task.name, "Review application");
+  assert.equal(task.raw.get("implementation"), "delegate");
+  assert.equal(task.raw.get("retryCounter"), "3");
+  expectModelError("INVALID_PROPERTY", () =>
+    task.setProperties({ id: "Renamed_task" } as never)
+  );
 });
 
 test("rejects wrappers from another model without mutating either graph", async () => {

@@ -6,7 +6,8 @@ export {
   type CustomPropertyValue,
   type FormConfiguration,
   type IoInput,
-  type OpenModelOptions
+  type OpenModelOptions,
+  type ScalarProperties
 } from "./model.js";
 export {
   type ElementProperties,

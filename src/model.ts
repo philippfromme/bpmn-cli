@@ -13,6 +13,7 @@ import {
 } from "./model-runtime.js";
 import {
   createElement,
+  type ElementProperties,
   type ElementPropertiesInput,
   type SupportedElementType,
   type TypedModdleElement
@@ -42,6 +43,20 @@ export interface IoInput {
 
 export type CustomPropertyValue = boolean | number | string;
 
+type ScalarPropertyValue = boolean | number | string;
+
+export type ScalarProperties<Type extends SupportedElementType> = Partial<Pick<
+  ElementProperties<Type>,
+  {
+    [Property in keyof ElementProperties<Type>]:
+      Property extends "id"
+        ? never
+        : NonNullable<ElementProperties<Type>[Property]> extends ScalarPropertyValue
+          ? Property
+          : never;
+  }[keyof ElementProperties<Type>]
+>>;
+
 export class ModelApiError extends Error {
   constructor(
     readonly code:
@@ -51,6 +66,7 @@ export class ModelApiError extends Error {
       | "INVALID_CONNECTION"
       | "INVALID_EXTENSION"
       | "INVALID_FORM"
+      | "INVALID_PROPERTY"
       | "ELEMENT_REFERENCED"
       | "FOREIGN_ELEMENT"
       | "OUTPUT_REQUIRED",
@@ -74,6 +90,18 @@ function isFlowElementContainer(element: ModdleElement): boolean {
 
 function isSequenceFlowEndpoint(element: ModdleElement): boolean {
   return element.$instanceOf("bpmn:FlowNode");
+}
+
+function isScalarProperty(property: {
+  isMany?: boolean;
+  isReference?: boolean;
+  type: string;
+}): boolean {
+  return (
+    property.isMany !== true &&
+    property.isReference !== true &&
+    ["Boolean", "Integer", "Real", "String"].includes(property.type)
+  );
 }
 
 function hasReference(element: ModdleElement, target: ModdleElement): boolean {
@@ -254,6 +282,26 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
 
   setName(name: string): this {
     this.raw.name = name;
+    return this;
+  }
+
+  setProperties(properties: ScalarProperties<Type>): this {
+    for (const [property, value] of Object.entries(properties)) {
+      const descriptor = typedDescriptorProperties(this.raw).find(
+        (candidate) => candidate.name === property
+      );
+      if (
+        property === "id" ||
+        descriptor === undefined ||
+        !isScalarProperty(descriptor)
+      ) {
+        throw new ModelApiError(
+          "INVALID_PROPERTY",
+          `${this.type}.${property} is not an editable scalar property`
+        );
+      }
+      this.raw.set(property, value);
+    }
     return this;
   }
 

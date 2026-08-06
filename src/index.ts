@@ -18,3 +18,12 @@ export {
   type PublicationResult,
   type PublishOptions
 } from "./model-runtime.js";
+export {
+  Bpmn,
+  BranchBuilder,
+  ProcessBuilder,
+  ProcessBuilderError,
+  type NodeOptions,
+  type ProcessOptions,
+  type ServiceTaskOptions
+} from "./fluent.js";

@@ -11,6 +11,34 @@ npm install @philippfromme/bpmn-cli
 import { BpmnModel } from "@philippfromme/bpmn-cli";
 ```
 
+## Generate a process from a script
+
+```ts
+import { Bpmn } from "@philippfromme/bpmn-cli";
+
+const process = await Bpmn.createProcess("approval-flow", {
+  name: "Approval flow"
+});
+
+await process
+  .startEvent("start", { name: "Request Submitted" })
+  .userTask("review", { name: "Review request" })
+  .exclusiveGateway("approved", { name: "Approved?" })
+  .branch("yes", (branch) =>
+    branch
+      .condition("= approved")
+      .serviceTask("notify", { taskType: "send-email" })
+      .endEvent("done")
+  )
+  .branch("no", (branch) => branch.defaultFlow().endEvent("rejected"))
+  .publish({ output: "approval-flow.bpmn" });
+```
+
+`Bpmn` is the one-shot, semantic construction API for generator scripts.
+It creates executable processes, uses exact caller-supplied IDs, assigns
+conditions and default flows safely, applies deterministic layout by default,
+and delegates publication to the same verified atomic pipeline as `BpmnModel`.
+
 ## Edit an existing model
 
 ```ts

@@ -4,6 +4,39 @@
 BPMN XML remains the durable artifact, while the fluent API owns safe moddle
 construction and publication.
 
+## Generate a process
+
+Use `Bpmn` for a one-shot generator script. It is the high-level semantic API;
+it does not expose BPMN XML, Diagram Interchange, cursor state, or a command
+language.
+
+```ts
+import { Bpmn } from "@philippfromme/bpmn-cli";
+
+const process = await Bpmn.createProcess("approval-flow", {
+  name: "Approval flow"
+});
+
+await process
+  .startEvent("start")
+  .userTask("review", { name: "Review request" })
+  .exclusiveGateway("approved", { name: "Approved?" })
+  .branch("yes", (branch) =>
+    branch
+      .condition("= approved")
+      .serviceTask("notify", { taskType: "send-email" })
+      .endEvent("done")
+  )
+  .branch("no", (branch) => branch.defaultFlow().endEvent("rejected"))
+  .publish({ output: "approval-flow.bpmn" });
+```
+
+Every branch must begin with `condition(expression)` or `defaultFlow()` and
+end with `endEvent()`. `build()` returns the underlying `BpmnModel` when a
+script needs the lower-level exact-ID API before publication. `publish()`
+retains the standard validation, deterministic auto-layout, semantic
+verification, and atomic-output behavior.
+
 ## Open and change an existing model
 
 ```ts

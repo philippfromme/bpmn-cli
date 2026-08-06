@@ -428,7 +428,9 @@ export class BpmnModel {
     return new CustomExtensionElement(this, raw);
   }
 
-  process(properties: { id?: string; name?: string } = {}): ModelElement<"bpmn:Process"> {
+  process(
+    properties: { id?: string; isExecutable?: boolean; name?: string } = {}
+  ): ModelElement<"bpmn:Process"> {
     const process = this.create("bpmn:Process", properties);
     this.append(this.editable.definitions, process, "rootElements");
     return process;

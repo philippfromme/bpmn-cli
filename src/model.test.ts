@@ -240,6 +240,26 @@ test("creates contained Zeebe extension children through an exact-ID owner", asy
   );
 });
 
+test("removes a contained child through its exact-ID owner", async () => {
+  const model = await BpmnModel.create();
+  const process = model.process();
+  const task = model.create("bpmn:ServiceTask", {});
+  model.append(process, task, "flowElements");
+  const extensionElements = task.createChild(
+    "extensionElements",
+    "bpmn:ExtensionElements",
+    {}
+  );
+  const mapping = extensionElements.createChild("values", "zeebe:IoMapping", {});
+
+  extensionElements.removeChild("values", mapping);
+
+  assert.deepEqual(extensionElements.children("values"), []);
+  expectModelError("INVALID_PROPERTY", () =>
+    task.removeChild("extensionElements", mapping)
+  );
+});
+
 test("rejects wrappers from another model without mutating either graph", async () => {
   const firstModel = await BpmnModel.create();
   const firstProcess = firstModel.process();

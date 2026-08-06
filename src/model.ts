@@ -421,6 +421,27 @@ export class ModelElement<Type extends SupportedElementType = SupportedElementTy
     return child;
   }
 
+  removeChild(property: string, child: ModelElement): void {
+    const descriptor = typedDescriptorProperties(this.raw).find(
+      (candidate) => candidate.name === property
+    );
+    const value = this.raw.get(property);
+    const contains = Array.isArray(value)
+      ? value.includes(child.raw)
+      : value === child.raw;
+    if (
+      descriptor === undefined ||
+      descriptor.isReference === true ||
+      !contains
+    ) {
+      throw new ModelApiError(
+        "INVALID_PROPERTY",
+        `${this.type}.${property} does not contain the selected child`
+      );
+    }
+    this.model.remove(child);
+  }
+
   configureForm(configuration: FormConfiguration): this {
     if (!this.raw.$instanceOf("bpmn:UserTask")) {
       throw new ModelApiError(
